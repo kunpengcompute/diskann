@@ -3,9 +3,13 @@
 
 #pragma once
 
+#ifdef FAST_DISKANN
+#include <arm_neon.h>
+#else
 #include <immintrin.h>
 #include <smmintrin.h>
 #include <tmmintrin.h>
+#endif
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>

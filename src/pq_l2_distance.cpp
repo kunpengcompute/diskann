@@ -4,7 +4,11 @@
 #include "pq_scratch.h"
 
 // block size for reading/processing large files and matrices in blocks
+#ifdef FAST_DISKANN
+#define BLOCK_SIZE 1000000
+#else
 #define BLOCK_SIZE 5000000
+#endif
 
 namespace diskann
 {

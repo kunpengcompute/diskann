@@ -1272,6 +1272,19 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
                                                  const uint32_t io_limit, const bool use_reorder_data,
                                                  QueryStats *stats)
 {
+#ifdef FAST_DISKANN
+    Timer preprocess_timer;
+    Timer cache_quant_compute_timer;
+    Timer cache_acc_compute_timer;
+    Timer disk_req_prepare_timer;
+    Timer disk_req_submit_timer;
+    Timer disk_req_wait_timer;
+    Timer disk_req_quant_compute_timer;
+    Timer disk_req_acc_compute_timer;
+    Timer postprocess_timer;
+
+    preprocess_timer.reset();
+#endif
 
     uint64_t num_sector_per_nodes = DIV_ROUND_UP(_max_node_len, defaults::SECTOR_LEN);
     if (beam_width > num_sector_per_nodes * defaults::MAX_N_SECTOR_READS)
@@ -1327,7 +1340,11 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
 
     // pointers to buffers for data
     T *data_buf = query_scratch->coord_scratch;
+#ifdef FAST_DISKANN
+    __builtin_prefetch((char *)data_buf, 0, 2);
+#else
     _mm_prefetch((char *)data_buf, _MM_HINT_T1);
+#endif
 
     // sector scratch
     char *sector_scratch = query_scratch->sector_scratch;
@@ -1356,7 +1373,11 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
     tsl::robin_set<uint64_t> &visited = query_scratch->visited;
     NeighborPriorityQueue &retset = query_scratch->retset;
     retset.reserve(l_search);
+#ifdef FAST_DISKANN
+    std::vector<SmallNeighbor> &full_retset = query_scratch->full_retset;
+#else
     std::vector<Neighbor> &full_retset = query_scratch->full_retset;
+#endif
 
     uint32_t best_medoid = 0;
     float best_dist = (std::numeric_limits<float>::max)();
@@ -1414,6 +1435,9 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
     frontier_read_reqs.reserve(2 * beam_width);
     std::vector<std::pair<uint32_t, std::pair<uint32_t, uint32_t *>>> cached_nhoods;
     cached_nhoods.reserve(2 * beam_width);
+#ifdef FAST_DISKANN
+    stats->preprocess_us += (float)preprocess_timer.elapsed();
+#endif
 
     while (retset.has_unexpanded_node() && num_ios < io_limit)
     {
@@ -1449,6 +1473,9 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
         }
 
         // read nhoods of frontier ids
+#ifdef FAST_DISKANN
+        disk_req_prepare_timer.reset();
+#endif
         if (!frontier.empty())
         {
             if (stats != nullptr)
@@ -1482,6 +1509,9 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
                 stats->io_us += (float)io_timer.elapsed();
             }
         }
+#ifdef FAST_DISKANN
+        stats->disk_req_prepare_us += (float)disk_req_prepare_timer.elapsed();
+#endif
 
         // process cached nhoods
         for (auto &cached_nhood : cached_nhoods)
@@ -1489,6 +1519,9 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
             auto global_cache_iter = _coord_cache.find(cached_nhood.first);
             T *node_fp_coords_copy = global_cache_iter->second;
             float cur_expanded_dist;
+#ifdef FAST_DISKANN
+            cache_acc_compute_timer.reset();
+#endif
             if (!_use_disk_index_pq)
             {
                 cur_expanded_dist = _dist_cmp->compare(aligned_query_T, node_fp_coords_copy, (uint32_t)_aligned_dim);
@@ -1501,18 +1534,29 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
                     cur_expanded_dist = _disk_pq_table.l2_distance( // disk_pq does not support OPQ yet
                         query_float, (uint8_t *)node_fp_coords_copy);
             }
+#ifdef FAST_DISKANN
+            stats->cache_acc_compute_us += (float)cache_acc_compute_timer.elapsed();
+            full_retset.push_back(SmallNeighbor((uint32_t)cached_nhood.first, cur_expanded_dist));
+#else
             full_retset.push_back(Neighbor((uint32_t)cached_nhood.first, cur_expanded_dist));
+#endif
 
             uint64_t nnbrs = cached_nhood.second.first;
             uint32_t *node_nbrs = cached_nhood.second.second;
 
             // compute node_nbrs <-> query dists in PQ space
             cpu_timer.reset();
+#ifdef FAST_DISKANN
+            cache_quant_compute_timer.reset();
+#endif
             compute_dists(node_nbrs, nnbrs, dist_scratch);
             if (stats != nullptr)
             {
                 stats->n_cmps += (uint32_t)nnbrs;
                 stats->cpu_us += (float)cpu_timer.elapsed();
+#ifdef FAST_DISKANN
+                stats->cache_quant_compute_us += (float)cache_acc_compute_timer.elapsed();
+#endif
             }
 
             // process prefetched nhood
@@ -1555,6 +1599,9 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
             T *node_fp_coords = offset_to_node_coords(node_disk_buf);
             memcpy(data_buf, node_fp_coords, _disk_bytes_per_point);
             float cur_expanded_dist;
+#ifdef FAST_DISKANN
+            disk_req_acc_compute_timer.reset();
+#endif
             if (!_use_disk_index_pq)
             {
                 cur_expanded_dist = _dist_cmp->compare(aligned_query_T, data_buf, (uint32_t)_aligned_dim);
@@ -1566,15 +1613,26 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
                 else
                     cur_expanded_dist = _disk_pq_table.l2_distance(query_float, (uint8_t *)data_buf);
             }
+#ifdef FAST_DISKANN
+            stats->disk_req_acc_compute_us += (float)disk_req_acc_compute_timer.elapsed();
+            full_retset.push_back(SmallNeighbor(frontier_nhood.first, cur_expanded_dist));
+#else
             full_retset.push_back(Neighbor(frontier_nhood.first, cur_expanded_dist));
+#endif
             uint32_t *node_nbrs = (node_buf + 1);
             // compute node_nbrs <-> query dist in PQ space
             cpu_timer.reset();
+#ifdef FAST_DISKANN
+            disk_req_quant_compute_timer.reset();
+#endif
             compute_dists(node_nbrs, nnbrs, dist_scratch);
             if (stats != nullptr)
             {
                 stats->n_cmps += (uint32_t)nnbrs;
                 stats->cpu_us += (float)cpu_timer.elapsed();
+#ifdef FAST_DISKANN
+                stats->disk_req_quant_compute_us += (float)disk_req_quant_compute_timer.elapsed();
+#endif
             }
 
             cpu_timer.reset();
@@ -1612,6 +1670,9 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
     }
 
     // re-sort by distance
+#ifdef FAST_DISKANN
+    postprocess_timer.reset();
+#endif
     std::sort(full_retset.begin(), full_retset.end());
 
     if (use_reorder_data)
@@ -1688,6 +1749,9 @@ void PQFlashIndex<T, LabelT>::cached_beam_search(const T *query1, const uint64_t
             }
         }
     }
+#ifdef FAST_DISKANN
+    stats->postprocess_us += (float)postprocess_timer.elapsed();
+#endif
 
 #ifdef USE_BING_INFRA
     ctx.m_completeCount = 0;
