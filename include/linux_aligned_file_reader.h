@@ -12,6 +12,9 @@ class LinuxAlignedFileReader : public AlignedFileReader
     uint64_t file_sz;
     FileHandle file_desc;
     io_context_t bad_ctx = (io_context_t)-1;
+#ifdef FAST_DISKANN
+    timespec ts_0{0, 0};
+#endif
 
   public:
     LinuxAlignedFileReader();
@@ -34,6 +37,11 @@ class LinuxAlignedFileReader : public AlignedFileReader
     // process batch of aligned requests in parallel
     // NOTE :: blocking call
     void read(std::vector<AlignedRead> &read_reqs, IOContext &ctx, bool async = false);
+#ifdef FAST_DISKANN
+    void submit_async(std::vector<AlignedRead> &read_reqs, IOContext &ctx, uint64_t &io_count_async, std::vector<struct iocb> &cb_async, std::vector<struct iocb*> &cbs_async);
+    void wait_async(IOContext &ctx, uint64_t &io_count_async, std::vector<io_event> &evts_async);
+    int64_t wait_async_try(IOContext &ctx, uint64_t &io_count_async, std::vector<io_event> &evts_async);
+#endif
 };
 
 #endif

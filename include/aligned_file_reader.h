@@ -4,6 +4,9 @@
 #pragma once
 
 #define MAX_IO_DEPTH 128
+#ifdef FAST_DISKANN
+#define _FILE_OFFSET_BITS 64
+#endif
 
 #include <vector>
 #include <atomic>
@@ -117,4 +120,20 @@ class AlignedFileReader
     // process batch of aligned requests in parallel
     // NOTE :: blocking call
     virtual void read(std::vector<AlignedRead> &read_reqs, IOContext &ctx, bool async = false) = 0;
+#ifdef FAST_DISKANN
+    virtual void submit_async(std::vector<AlignedRead> &read_reqs, IOContext &ctx, uint64_t &io_count_async,
+                              std::vector<struct iocb> &cb_async, std::vector<struct iocb *> &cbs_async)
+    {
+        diskann::cerr << "Async not supported in this platform" << std::endl;
+    };
+    virtual void wait_async(IOContext &ctx, uint64_t &io_count_async, std::vector<io_event> &evts_async)
+    {
+        diskann::cerr << "Async not supported in this platform" << std::endl;
+    };
+    virtual int64_t wait_async_try(IOContext &ctx, uint64_t &io_count_async, std::vector<io_event> &evts_async)
+    {
+        diskann::cerr << "Async not supported in this platform" << std::endl;
+        return -1;
+    };
+#endif
 };
