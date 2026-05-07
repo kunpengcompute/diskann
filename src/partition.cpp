@@ -26,7 +26,11 @@
 #endif
 
 // block size for reading/ processing large files and matrices in blocks
+#ifdef FAST_DISKANN
+#define BLOCK_SIZE 1000000
+#else
 #define BLOCK_SIZE 5000000
+#endif
 
 // #define SAVE_INFLATED_PQ true
 
@@ -99,6 +103,80 @@ void gen_random_slice(const std::string data_file, double p_val, float *&sampled
     uint32_t npts32, ndims32;
     std::vector<std::vector<float>> sampled_vectors;
 
+#ifdef FAST_DISKANN
+    std::ifstream base_reader(data_file.c_str(), std::ios::binary | std::ios::in);
+    if (!base_reader.is_open())
+        throw std::runtime_error("[Debug] Failed to open T data file: " + data_file);
+
+    // metadata: npts, ndims
+    base_reader.read((char *)&npts32, sizeof(uint32_t));
+    base_reader.read((char *)&ndims32, sizeof(uint32_t));
+    npts = npts32;
+    ndims = ndims32;
+    const uint64_t row_bytes = ndims * sizeof(T);
+    const uint64_t expected_file_size = sizeof(uint32_t) * 2 + npts * row_bytes;
+    const uint64_t actual_file_size = get_file_size(data_file);
+    if (expected_file_size != actual_file_size)
+    {
+        throw std::runtime_error("[Debug] File size mismatch for file: " + data_file + ". Expected: " +
+                                 std::to_string(expected_file_size) + " Actual: " + std::to_string(actual_file_size));
+    }
+    else
+    {
+        diskann::cout << "[Debug] File size match for file: " << data_file << ". Expected: " << expected_file_size
+                      << " Actual: " << actual_file_size << std::endl;
+    }
+
+    std::unique_ptr<T[]> cur_vector_T = std::make_unique<T[]>(ndims);
+    p_val = p_val < 1 ? p_val : 1;
+
+    std::random_device rd; // Will be used to obtain a seed for the random number
+    size_t x = rd();
+    std::mt19937 generator((uint32_t)x);
+    std::uniform_real_distribution<float> distribution(0, 1);
+
+    bool print = true;
+    for (size_t i = 0; i < npts; i++)
+    {
+        float rnd_val = distribution(generator);
+        if (rnd_val < p_val)
+        {
+            base_reader.read((char *)cur_vector_T.get(), ndims * sizeof(T));
+            std::vector<float> cur_vector_float;
+            cur_vector_float.reserve(ndims);
+
+            for (size_t d = 0; d < ndims; d++)
+                cur_vector_float.push_back(cur_vector_T[d]);
+            sampled_vectors.push_back(cur_vector_float);
+            if (print)
+            {
+                diskann::cout << "[Debug] gen_random_slice<T> print 1st vector from file : ";
+                for (size_t d = 0; d < ndims; d++)
+                {
+                    diskann::cout << cur_vector_float[d] << " ";
+                }
+                print = false;
+                diskann::cout << std::endl;
+            }
+        }
+        else
+        {
+            base_reader.seekg(row_bytes, std::ios::cur);
+        }
+        if (!base_reader)
+            throw std::runtime_error("Error while reading T row in file");
+    }
+    slice_size = sampled_vectors.size();
+    sampled_data = new float[slice_size * ndims];
+    for (size_t i = 0; i < slice_size; i++)
+    {
+        for (size_t j = 0; j < ndims; j++)
+        {
+            sampled_data[i * ndims + j] = sampled_vectors[i][j];
+        }
+    }
+    diskann::cout << "[Debug] gen_random_slice<T> done." << std::endl;
+#else
     // amount to read in one shot
     size_t read_blk_size = 64 * 1024 * 1024;
     // create cached reader + writer
@@ -139,6 +217,7 @@ void gen_random_slice(const std::string data_file, double p_val, float *&sampled
             sampled_data[i * ndims + j] = sampled_vectors[i][j];
         }
     }
+#endif
 }
 
 // same as above, but samples from the matrix inputdata instead of a file of
@@ -523,6 +602,151 @@ template <typename T>
 int partition_with_ram_budget(const std::string data_file, const double sampling_rate, double ram_budget,
                               size_t graph_degree, const std::string prefix_path, size_t k_base)
 {
+#ifdef FAST_DISKANN
+    // try to find if there are partition results
+    std::string cur_file = std::string(prefix_path);
+    std::string clusters_num_data_path = cur_file + "_clusters_num.bin";
+    bool partition_again = false;
+    int num_parts = 0;
+    if (file_exists(clusters_num_data_path))
+    {
+        uint64_t dumr, dumc;
+        float *val;
+        diskann::load_bin<float>(clusters_num_data_path, val, dumr, dumc);
+        if (dumr == 1 && dumc == 1 && *val >= 1)
+        {
+            uint64_t total_size = 0;
+            int val_int = *val;
+            for (int i = 0; i < val_int; i++)
+            {
+                std::string idmap_filename = prefix_path + "_subshard-" + std::to_string(i) + "_ids_uint32.bin";
+                if (file_exists(idmap_filename))
+                {
+                    auto size = get_file_size(idmap_filename);
+                    total_size += (size - 8);
+                }
+                else
+                {
+                    diskann::cout << "[Partition] Idmap_file " << idmap_filename << " doesn't exist, partition again"
+                              << std::endl;
+                    partition_again = true;
+                    break;
+                }
+            }
+            uint64_t data_num, data_dim;
+            diskann::get_bin_metadata(data_file, data_num, data_dim);
+            if (total_size / sizeof(uint32_t) == data_num * k_base)
+            {
+                std::cout << "[Partition] Idmap_files" << " all exists, don't partition. "
+                          << total_size / sizeof(uint32_t) << " Vs " << data_num * k_base << std::endl;
+                num_parts = *val;
+                num_parts = -num_parts;
+            }
+            else
+            {
+                partition_again = true;
+                std::cout << "[Partition] Idmap_files has wrong base vector ids, partition again. "
+                          << total_size / sizeof(uint32_t) << " Vs " << data_num * k_base << std::endl;
+            }
+        }
+        else
+        {
+            partition_again = true;
+            std::cout << "[Partition] Clusters_num_data " << clusters_num_data_path << " is wrone, partition again"
+                      << " " << dumr << " " << dumc << " " << *val << std::endl;
+        }
+    }
+    else
+    {
+        partition_again = true;
+        std::cout << "[Partition] Clusters_num_data " << clusters_num_data_path << " doesn't exists, partition again"
+                  << std::endl;
+    }
+
+    if (partition_again)
+    {
+        num_parts = 3;
+        size_t train_dim;
+        size_t num_train;
+        float *train_data_float;
+        size_t max_k_means_reps = 10;
+
+        bool fit_in_ram = false;
+
+        gen_random_slice<T>(data_file, sampling_rate, train_data_float, num_train, train_dim);
+
+        size_t test_dim;
+        size_t num_test;
+        float *test_data_float;
+        gen_random_slice<T>(data_file, sampling_rate, test_data_float, num_test, test_dim);
+
+        float *pivot_data = nullptr;
+
+        std::string output_file;
+
+        // kmeans_partitioning on training data
+
+        //  cur_file = cur_file + "_kmeans_partitioning-" +
+        //  std::to_string(num_parts);
+        output_file = cur_file + "_centroids.bin";
+
+        while (!fit_in_ram)
+        {
+            fit_in_ram = true;
+
+            double max_ram_usage = 0;
+            if (pivot_data != nullptr)
+                delete[] pivot_data;
+
+            pivot_data = new float[num_parts * train_dim];
+            // Process Global k-means for kmeans_partitioning Step
+            diskann::cout << "Processing global k-means (kmeans_partitioning Step)" << std::endl;
+            kmeans::kmeanspp_selecting_pivots(train_data_float, num_train, train_dim, pivot_data, num_parts);
+
+            kmeans::run_lloyds(train_data_float, num_train, train_dim, pivot_data, num_parts, max_k_means_reps, NULL,
+                               NULL);
+
+            // now pivots are ready. need to stream base points and assign them to
+            // closest clusters.
+
+            std::vector<size_t> cluster_sizes;
+            estimate_cluster_sizes(test_data_float, num_test, pivot_data, num_parts, train_dim, k_base, cluster_sizes);
+
+            for (auto &p : cluster_sizes)
+            {
+                // to account for the fact that p is the size of the shard over the
+                // testing sample.
+                p = (uint64_t)(p / sampling_rate);
+                double cur_shard_ram_estimate =
+                    diskann::estimate_ram_usage(p, (uint32_t)train_dim, sizeof(T), (uint32_t)graph_degree);
+
+                if (cur_shard_ram_estimate > max_ram_usage)
+                    max_ram_usage = cur_shard_ram_estimate;
+            }
+            diskann::cout << "With " << num_parts
+                          << " parts, max estimated RAM usage: " << max_ram_usage / (1024 * 1024 * 1024)
+                          << "GB, budget given is " << ram_budget << std::endl;
+            if (max_ram_usage > 1024 * 1024 * 1024 * ram_budget)
+            {
+                fit_in_ram = false;
+                num_parts += 2;
+            }
+        }
+
+        diskann::cout << "Saving global k-center pivots" << std::endl;
+        diskann::save_bin<float>(output_file.c_str(), pivot_data, (size_t)num_parts, train_dim);
+
+        shard_data_into_clusters_only_ids<T>(data_file, pivot_data, num_parts, train_dim, k_base, prefix_path);
+
+        float num_parts_float = num_parts;
+        diskann::save_bin<float>(clusters_num_data_path.c_str(), &num_parts_float, (size_t)1, (size_t)1);
+
+        delete[] pivot_data;
+        delete[] train_data_float;
+        delete[] test_data_float;
+    }
+    return num_parts;
+#else
     size_t train_dim;
     size_t num_train;
     float *train_data_float;
@@ -599,6 +823,7 @@ int partition_with_ram_budget(const std::string data_file, const double sampling
     delete[] train_data_float;
     delete[] test_data_float;
     return num_parts;
+#endif
 }
 
 // Instantations of supported templates
