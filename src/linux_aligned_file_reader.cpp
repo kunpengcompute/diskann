@@ -226,3 +226,84 @@ void LinuxAlignedFileReader::read(std::vector<AlignedRead> &read_reqs, io_contex
     assert(this->file_desc != -1);
     execute_io(ctx, this->file_desc, read_reqs);
 }
+
+#ifdef FAST_DISKANN
+void LinuxAlignedFileReader::submit_async(std::vector<AlignedRead> &read_reqs, IOContext &ctx, uint64_t &io_count_async,
+                                          std::vector<struct iocb> &cb_async, std::vector<struct iocb *> &cbs_async)
+{
+    if (this->file_desc == -1)
+    {
+        throw std::runtime_error("File not opened for submit_async");
+    }
+    if (io_count_async + read_reqs.size() > MAX_EVENTS)
+    {
+        throw std::runtime_error("Async I/O count exceeds MAX_EVENTS");
+    }
+#ifdef DEBUG
+    for (auto &req : read_reqs)
+    {
+        assert(IS_ALIGNED(req.len, 512));
+        assert(IS_ALIGNED(req.offset, 512));
+        assert(IS_ALIGNED(req.buf, 512));
+    }
+#endif
+    // read_reqs.size() must be less than MAX_EVENTS
+    uint64_t n_ops = (uint64_t)read_reqs.size();
+    for (uint64_t j = 0; j < n_ops; j++)
+    {
+        io_prep_pread(cb_async.data() + j + io_count_async, this->file_desc, read_reqs[j].buf, read_reqs[j].len,
+                      read_reqs[j].offset);
+    }
+
+    // initialize `cbs` using `cb` array
+    //
+
+    for (uint64_t i = io_count_async; i < n_ops + io_count_async; i++)
+    {
+        cbs_async[i] = cb_async.data() + i;
+    }
+
+    // issue reads
+    int64_t ret = io_submit(ctx, (int64_t)n_ops, cbs_async.data() + io_count_async);
+    // if requests didn't get accepted
+    if (ret != (int64_t)n_ops)
+    {
+        std::cerr << "Called submit_async: aio io_submit() failed; returned " << ret << ", expected=" << n_ops
+                  << ", ernno=" << errno << "=" << ::strerror(-ret);
+        std::cout << ", ctx: " << ctx << "\n";
+        throw std::runtime_error("submit_async: io_submit() failed");
+    }
+    io_count_async += read_reqs.size();
+
+    // disabled since req.buf could be an offset into another buf
+    /*
+    for (auto &req : read_reqs) {
+        // corruption check
+        assert(malloc_usable_size(req.buf) >= req.len);
+    }
+    */
+}
+
+void LinuxAlignedFileReader::wait_async(io_context_t &ctx, uint64_t &io_count_async, std::vector<io_event> &evts_async)
+{
+    // wait on io_getevents
+    int64_t n_ops = (int64_t)io_count_async;
+    int64_t ret = io_getevents(ctx, (int64_t)n_ops, (int64_t)n_ops, evts_async.data(), nullptr);
+    // if requests didn't complete
+    if (ret != (int64_t)n_ops)
+    {
+        std::cerr << "io_getevents() failed; returned " << ret << ", expected=" << n_ops << ", ernno=" << errno << "="
+                  << ::strerror(-ret);
+        throw std::runtime_error("wait_async: io_getevents() failed");
+    }
+}
+
+int64_t LinuxAlignedFileReader::wait_async_try(io_context_t &ctx, uint64_t &io_count_async,
+                                            std::vector<io_event> &evts_async)
+{
+    // wait on io_getevents
+    int64_t n_ops = (int64_t)io_count_async;
+    int64_t ret = io_getevents(ctx, (int64_t)n_ops, (int64_t)n_ops, evts_async.data(), &ts_0);
+    return ret; // return the number of events processed
+}
+#endif
