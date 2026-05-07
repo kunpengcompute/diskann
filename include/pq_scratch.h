@@ -3,6 +3,13 @@
 #include "pq_common.h"
 #include "utils.h"
 
+#ifdef FAST_DISKANN
+template <typename T> inline float pq_cast_to_float(T v)
+{
+    return static_cast<float>(v);
+}
+#endif
+
 namespace diskann
 {
 
