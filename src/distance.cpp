@@ -1,6 +1,9 @@
 // TODO
 // CHECK COSINE ON LINUX
 
+#ifdef FAST_DISKANN
+#include <arm_neon.h>
+#else
 #ifdef _WINDOWS
 #include <immintrin.h>
 #include <smmintrin.h>
@@ -8,6 +11,7 @@
 #include <intrin.h>
 #else
 #include <immintrin.h>
+#endif
 #endif
 
 #include "simd_utils.h"
@@ -210,12 +214,39 @@ float DistanceL2Float::compare(const float *a, const float *b, uint32_t size) co
     result = _mm256_reduce_add_ps(sum);
 #else
 #ifndef _WINDOWS
+#ifdef FAST_DISKANN
+    // assume size is divisible by 4
+    int32_t i = 0;
+    float32x4_t acc = vdupq_n_f32(0.0f);
+    int32_t iters = size / 4;
+    for (; i < iters; i++)
+    {
+        if (i < iters - 1)
+        {
+            __builtin_prefetch((const char *)(a + (i + 1) * 4), 0, 3);
+            __builtin_prefetch((const char *)(b + (i + 1) * 4), 0, 3);
+        }
+        float32x4_t vec_a = vld1q_f32(a + i * 4);
+        float32x4_t vec_b = vld1q_f32(b + i * 4);
+        float32x4_t diff = vsubq_f32(vec_a, vec_b);
+        acc = vmlaq_f32(acc, diff, diff); // acc += diff * diff
+    }
+
+    result = vaddvq_f32(acc);
+
+#else
 #pragma omp simd reduction(+ : result) aligned(a, b : 32)
-#endif
     for (int32_t i = 0; i < (int32_t)size; i++)
     {
         result += (a[i] - b[i]) * (a[i] - b[i]);
     }
+#endif
+#else
+    for (int32_t i = 0; i < (int32_t)size; i++)
+    {
+        result += (a[i] - b[i]) * (a[i] - b[i]);
+    }
+#endif
 #endif
     return result;
 }
@@ -385,6 +416,29 @@ template <typename T> float DistanceInnerProduct<T>::inner_product(const T *a, c
     result += unpack[0] + unpack[1] + unpack[2] + unpack[3];
 #else
 
+#ifdef FAST_DISKANN
+#define NEON_DOT(addr1, addr2, dest, tmp1, tmp2)                                                                       \
+    tmp1 = vld1q_f32(addr1);                                                                                           \
+    tmp2 = vld1q_f32(addr2);                                                                                           \
+    dest = vfmaq_f32(dest, tmp1, tmp2);
+
+    float32x4_t sum_vec = vdupq_n_f32(0);
+    float32x4_t vec1, vec2;
+    unsigned i = 0;
+    const float *l = (float *)a;
+    const float *r = (float *)b;
+    for (; i + 4 <= size; i += 4)
+    {
+        NEON_DOT(l + i, r + i, sum_vec, vec1, vec2);
+    }
+    float sum = vaddvq_f32(sum_vec);
+    for (; i < size; ++i)
+    {
+        float dot = l[i] * r[i];
+        sum += dot;
+    }
+    result = sum;
+#else
     float dot0, dot1, dot2, dot3;
     const float *last = a + size;
     const float *unroll_group = last - 3;
@@ -405,6 +459,7 @@ template <typename T> float DistanceInnerProduct<T>::inner_product(const T *a, c
     {
         result += *a++ * *b++;
     }
+#endif
 #endif
 #endif
 #endif
@@ -493,6 +548,28 @@ template <typename T> float DistanceFastL2<T>::norm(const T *a, uint32_t size) c
     _mm_storeu_ps(unpack, sum);
     result += unpack[0] + unpack[1] + unpack[2] + unpack[3];
 #else
+#ifdef FAST_DISKANN
+#define NEON_NORM(addr, dest, tmp)                                                                                     \
+    tmp = vld1q_f32(addr);                                                                                             \
+    dest = vfmaq_f32(dest, tmp, tmp);
+
+    float32x4_t sum_vec = vdupq_n_f32(0);
+    float32x4_t vec;
+    unsigned i = 0;
+    const float *l = (float *)a;
+
+    for (; i + 4 <= size; i += 4)
+    {
+        NEON_NORM(l + i, sum_vec, vec);
+    }
+    float sum = vaddvq_f32(sum_vec);
+    for (; i < size; ++i)
+    {
+        float norm = l[i] * l[i];
+        sum += norm;
+    }
+    result = sum;
+#else
     float dot0, dot1, dot2, dot3;
     const float *last = a + size;
     const float *unroll_group = last - 3;
@@ -516,12 +593,14 @@ template <typename T> float DistanceFastL2<T>::norm(const T *a, uint32_t size) c
 #endif
 #endif
 #endif
+#endif
     return result;
 }
 
 float AVXDistanceInnerProductFloat::compare(const float *a, const float *b, uint32_t size) const
 {
     float result = 0.0f;
+#ifndef FAST_DISKANN
 #define AVX_DOT(addr1, addr2, dest, tmp1, tmp2)                                                                        \
     tmp1 = _mm256_loadu_ps(addr1);                                                                                     \
     tmp2 = _mm256_loadu_ps(addr2);                                                                                     \
@@ -558,6 +637,24 @@ float AVXDistanceInnerProductFloat::compare(const float *a, const float *b, uint
     _mm256_storeu_ps(unpack, sum);
     result = unpack[0] + unpack[1] + unpack[2] + unpack[3] + unpack[4] + unpack[5] + unpack[6] + unpack[7];
 
+#else
+    float32x4_t sum_vec = vdupq_n_f32(0);
+    float32x4_t vec1, vec2;
+    unsigned i = 0;
+    const float *l = (float *)a;
+    const float *r = (float *)b;
+    for (; i + 4 <= size; i += 4)
+    {
+        NEON_DOT(l + i, r + i, sum_vec, vec1, vec2);
+    }
+    float sum = vaddvq_f32(sum_vec);
+    for (; i < size; ++i)
+    {
+        float dot = l[i] * r[i];
+        sum += dot;
+    }
+    result = sum;
+#endif
     return -result;
 }
 

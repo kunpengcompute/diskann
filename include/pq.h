@@ -32,10 +32,18 @@ class FixedChunkPQTable
 
     uint32_t get_num_chunks();
 
+#ifdef FAST_DISKANN
+    void create_sdc_table();
+#endif
+
     void preprocess_query(float *query_vec);
 
     // assumes pre-processed query
     void populate_chunk_distances(const float *query_vec, float *dist_vec);
+
+#ifdef FAST_DISKANN
+    float compute_query_residual_norm(const float *query_vec, float *dist_vec) const;
+#endif
 
     float l2_distance(const float *query_vec, uint8_t *base_vec);
 
@@ -46,6 +54,35 @@ class FixedChunkPQTable
 
     void populate_chunk_inner_products(const float *query_vec, float *dist_vec);
 };
+
+#ifdef FAST_DISKANN
+inline size_t round_up(size_t x, size_t align)
+{
+    return ((x + align - 1) / align) * align;
+}
+
+inline void* alloc_hugepage_soft(size_t bytes)
+{
+    const size_t alignment = 2 * 1024 * 1024;  // 2MB
+    size_t aligned_bytes = round_up(bytes, alignment);
+
+    void* ptr = aligned_alloc(alignment, aligned_bytes);
+    if (!ptr)
+    {
+        perror("aligned_alloc failed");
+        return nullptr;
+    }
+
+    // Hint kernel to use Transparent Huge Pages
+    if (madvise(ptr, aligned_bytes, MADV_HUGEPAGE) != 0)
+    {
+        perror("madvise failed");
+    }
+
+    memset(ptr, 0, aligned_bytes);  // Trigger actual allocation
+    return ptr;
+}
+#endif
 
 void aggregate_coords(const std::vector<unsigned> &ids, const uint8_t *all_coords, const uint64_t ndims, uint8_t *out);
 

@@ -114,16 +114,83 @@ template <typename T, typename LabelT = uint32_t> class PQFlashIndex
 
     DISKANN_DLLEXPORT void set_universal_label(const LabelT &label);
 
-  private:
-    DISKANN_DLLEXPORT inline bool point_has_label(uint32_t point_id, LabelT label_id);
-    std::unordered_map<std::string, LabelT> load_label_map(std::basic_istream<char> &infile);
-    DISKANN_DLLEXPORT void parse_label_file(std::basic_istream<char> &infile, size_t &num_pts_labels);
-    DISKANN_DLLEXPORT void get_label_file_metadata(const std::string &fileContent, uint32_t &num_pts,
-                                                   uint32_t &num_total_labels);
-    DISKANN_DLLEXPORT void generate_random_labels(std::vector<LabelT> &labels, const uint32_t num_labels,
-                                                  const uint32_t nthreads);
-    void reset_stream_for_reading(std::basic_istream<char> &infile);
+#ifdef FAST_DISKANN
+    // Member variables - set to protected for derived class access
+    diskann::Metric metric = diskann::Metric::L2;
 
+    // Data used for searching with re-order vectors
+    uint64_t _ndims_reorder_vecs = 0;
+    uint64_t _reorder_data_start_sector = 0;
+    uint64_t _nvecs_per_sector = 0;
+
+    // distance comparator
+    std::shared_ptr<Distance<T>> _dist_cmp;
+    std::shared_ptr<Distance<float>> _dist_cmp_float;
+
+    // for very large datasets: we use PQ even for the disk resident index
+    bool _use_disk_index_pq = false;
+    uint64_t _disk_pq_n_chunks = 0;
+    FixedChunkPQTable _disk_pq_table;
+
+    // medoid/start info
+    uint32_t *_medoids = nullptr;
+    size_t _num_medoids;
+    float *_centroid_data = nullptr;
+
+    // nhood_cache
+    unsigned *_nhood_cache_buf = nullptr;
+    tsl::robin_map<uint32_t, std::pair<uint32_t, uint32_t *>> _nhood_cache;
+
+    // coord_cache
+    T *_coord_cache_buf = nullptr;
+    tsl::robin_map<uint32_t, T *> _coord_cache;
+
+    // thread-specific scratch
+    ConcurrentQueue<SSDThreadData<T> *> _thread_data;
+    uint64_t _max_nthreads = 0;
+    bool _load_flag = false;
+    bool _count_visited_nodes = false;
+    bool _reorder_data_exists = false;
+    uint64_t _reoreder_data_offset = 0;
+
+    // filter support
+    uint32_t *_pts_to_label_offsets = nullptr;
+    uint32_t *_pts_to_label_counts = nullptr;
+    LabelT *_pts_to_labels = nullptr;
+    std::unordered_map<LabelT, std::vector<uint32_t>> _filter_to_medoid_ids;
+    bool _use_universal_label = false;
+    LabelT _universal_filter_label;
+    tsl::robin_set<uint32_t> _dummy_pts;
+    tsl::robin_set<uint32_t> _has_dummy_pts;
+    tsl::robin_map<uint32_t, uint32_t> _dummy_to_real_map;
+    tsl::robin_map<uint32_t, std::vector<uint32_t>> _real_to_dummy_map;
+    std::unordered_map<std::string, LabelT> _label_map;
+
+    // max_base_norm for MIPS
+    float _max_base_norm = 0.0f;
+
+    // PQ data
+    uint8_t *data = nullptr;
+    uint64_t _n_chunks;
+    FixedChunkPQTable _pq_table;
+
+    // data info
+    uint64_t _num_points = 0;
+    uint64_t _num_frozen_points = 0;
+    uint64_t _frozen_location = 0;
+    uint64_t _data_dim = 0;
+    uint64_t _aligned_dim = 0;
+    uint64_t _disk_bytes_per_point = 0; // Number of bytes
+
+    std::string _disk_index_file;
+    std::vector<std::pair<uint32_t, uint32_t>> _node_visit_counter;
+
+    // graph index info
+    uint64_t _max_node_len = 0;
+    uint64_t _nnodes_per_sector = 0;
+    uint64_t _max_degree = 0;
+
+    // Helper functions - moved to protected for derived class access
     // sector # on disk where node_id is present with in the graph part
     DISKANN_DLLEXPORT uint64_t get_node_sector(uint64_t node_id);
 
@@ -135,6 +202,17 @@ template <typename T, typename LabelT = uint32_t> class PQFlashIndex
 
     // returns region of `node_buf` containing [COORD(T)]
     DISKANN_DLLEXPORT T *offset_to_node_coords(char *node_buf);
+#endif
+
+  private:
+    DISKANN_DLLEXPORT inline bool point_has_label(uint32_t point_id, LabelT label_id);
+    std::unordered_map<std::string, LabelT> load_label_map(std::basic_istream<char> &infile);
+    DISKANN_DLLEXPORT void parse_label_file(std::basic_istream<char> &infile, size_t &num_pts_labels);
+    DISKANN_DLLEXPORT void get_label_file_metadata(const std::string &fileContent, uint32_t &num_pts,
+                                                   uint32_t &num_total_labels);
+    DISKANN_DLLEXPORT void generate_random_labels(std::vector<LabelT> &labels, const uint32_t num_labels,
+                                                  const uint32_t nthreads);
+    void reset_stream_for_reading(std::basic_istream<char> &infile);
 
     // index info for multi-node sectors
     // nhood of node `i` is in sector: [i / nnodes_per_sector]
@@ -149,6 +227,7 @@ template <typename T, typename LabelT = uint32_t> class PQFlashIndex
     // #nbrs of node `i`: *(unsigned*) (offset + disk_bytes_per_point)
     // nbrs of node `i` : (unsigned*) (offset + disk_bytes_per_point + 1)
 
+#ifndef FAST_DISKANN
     uint64_t _max_node_len = 0;
     uint64_t _nnodes_per_sector = 0; // 0 for multi-sector nodes, >0 for multi-node sectors
     uint64_t _max_degree = 0;
@@ -233,6 +312,19 @@ template <typename T, typename LabelT = uint32_t> class PQFlashIndex
     tsl::robin_map<uint32_t, uint32_t> _dummy_to_real_map;
     tsl::robin_map<uint32_t, std::vector<uint32_t>> _real_to_dummy_map;
     std::unordered_map<std::string, LabelT> _label_map;
+
+    // sector # on disk where node_id is present with in the graph part
+    DISKANN_DLLEXPORT uint64_t get_node_sector(uint64_t node_id);
+
+    // ptr to start of the node
+    DISKANN_DLLEXPORT char *offset_to_node(char *sector_buf, uint64_t node_id);
+
+    // returns region of `node_buf` containing [NNBRS][NBR_ID(uint32_t)]
+    DISKANN_DLLEXPORT uint32_t *offset_to_node_nhood(char *node_buf);
+
+    // returns region of `node_buf` containing [COORD(T)]
+    DISKANN_DLLEXPORT T *offset_to_node_coords(char *node_buf);
+#endif
 
 #ifdef EXEC_ENV_OLS
     // Set to a larger value than the actual header to accommodate
