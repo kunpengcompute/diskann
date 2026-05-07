@@ -1,17 +1,15 @@
-// Copyright (c) Microsoft Corporation. All rights reserved.
+// Copyright (c) Huawei Technologies Co., Ltd. All rights reserved.
 // Licensed under the MIT license.
 
 #pragma once
 
 #include <vector>
-
-#include "boost_dynamic_bitset_fwd.h"
-// #include "boost/dynamic_bitset.hpp"
+#include <boost/dynamic_bitset.hpp>
 #include "tsl/robin_set.h"
 #include "tsl/robin_map.h"
 #include "tsl/sparse_map.h"
 
-#include "aligned_file_reader.h"
+#include "io_uring_aligned_file_reader.h"
 #include "abstract_scratch.h"
 #include "neighbor.h"
 #include "defaults.h"
@@ -24,12 +22,12 @@ template <typename T> class PQScratch;
 //
 // AbstractScratch space for in-memory index based search
 //
-template <typename T> class InMemQueryScratch : public AbstractScratch<T>
+template <typename T> class InMemQueryScratchV2 : public AbstractScratch<T>
 {
   public:
-    ~InMemQueryScratch();
-    InMemQueryScratch(uint32_t search_l, uint32_t indexing_l, uint32_t r, uint32_t maxc, size_t dim, size_t aligned_dim,
-                      size_t alignment_factor, bool init_pq_scratch = false);
+    ~InMemQueryScratchV2();
+    InMemQueryScratchV2(uint32_t search_l, uint32_t indexing_l, uint32_t r, uint32_t maxc, size_t dim,
+                        size_t aligned_dim, size_t alignment_factor, bool init_pq_scratch = false);
     void resize_for_new_L(uint32_t new_search_l);
     void clear();
 
@@ -138,7 +136,7 @@ template <typename T> class InMemQueryScratch : public AbstractScratch<T>
 // AbstractScratch space for SSD index based search
 //
 
-template <typename T> class SSDQueryScratch : public AbstractScratch<T>
+template <typename T> class SSDQueryScratchV2 : public AbstractScratch<T>
 {
   public:
     T *coord_scratch = nullptr; // MUST BE AT LEAST [sizeof(T) * data_dim]
@@ -148,47 +146,42 @@ template <typename T> class SSDQueryScratch : public AbstractScratch<T>
 
     tsl::robin_set<size_t> visited;
     NeighborPriorityQueue retset;
-#ifdef FAST_DISKANN
     OriginNeighborPriorityQueue retset_lb;
     std::vector<SmallNeighbor> full_retset;
     std::vector<SmallNeighbor> pool;
 
-    // for async io
-    std::vector<struct iocb> cb_async;
-    std::vector<struct iocb *> cbs_async;
-    std::vector<io_event> evts_async;
+    // for async io (io-uring)
+    alignas(128) IORequest reqs[defaults::MAX_N_SECTOR_READS];
     std::vector<uint32_t> edges_buffer;
+    std::vector<uint32_t> decode_buffer;
 
     // for index build
     std::vector<float> occlude_factor;
     std::vector<uint32_t> pruned_list;
-#else
-    std::vector<Neighbor> full_retset;
-#endif
 
-    SSDQueryScratch(size_t aligned_dim, size_t visited_reserve);
-    ~SSDQueryScratch();
+    SSDQueryScratchV2(size_t aligned_dim, size_t visited_reserve);
+    ~SSDQueryScratchV2();
 
     void reset();
 };
 
-template <typename T> class SSDThreadData
+template <typename T> class SSDThreadDataV2
 {
   public:
-    SSDQueryScratch<T> scratch;
-    IOContext ctx;
+    SSDQueryScratchV2<T> scratch;
+    void *ctx;
 
-    SSDThreadData(size_t aligned_dim, size_t visited_reserve);
+    SSDThreadDataV2(size_t aligned_dim, size_t visited_reserve);
     void clear();
 };
 
 //
 // Class to avoid the hassle of pushing and popping the query scratch.
 //
-template <typename T> class ScratchStoreManager
+template <typename T> class ScratchStoreManagerV2
 {
   public:
-    ScratchStoreManager(ConcurrentQueue<T *> &query_scratch) : _scratch_pool(query_scratch)
+    ScratchStoreManagerV2(ConcurrentQueue<T *> &query_scratch) : _scratch_pool(query_scratch)
     {
         _scratch = query_scratch.pop();
         while (_scratch == nullptr)
@@ -202,7 +195,7 @@ template <typename T> class ScratchStoreManager
         return _scratch;
     }
 
-    ~ScratchStoreManager()
+    ~ScratchStoreManagerV2()
     {
         _scratch->clear();
         _scratch_pool.push(_scratch);
@@ -226,7 +219,7 @@ template <typename T> class ScratchStoreManager
   private:
     T *_scratch;
     ConcurrentQueue<T *> &_scratch_pool;
-    ScratchStoreManager(const ScratchStoreManager<T> &);
-    ScratchStoreManager &operator=(const ScratchStoreManager<T> &);
+    ScratchStoreManagerV2(const ScratchStoreManagerV2<T> &);
+    ScratchStoreManagerV2 &operator=(const ScratchStoreManagerV2<T> &);
 };
 } // namespace diskann
