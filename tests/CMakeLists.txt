@@ -48,6 +48,13 @@ set(DISKANN_UNIT_TEST_SOURCES
     distance_tests.cpp
     end_to_end_tests.cpp
     additional_coverage_tests.cpp
+    compress_vamana_tests.cpp
+    pq_neon_tests.cpp
+    partition_fast_tests.cpp
+    pq_flash_index_integration_tests.cpp
+    simple_pq_coverage_tests.cpp
+    pq_flash_index_coverage_tests.cpp
+    pq_flash_index_mg_coverage_tests.cpp
 )
 else()
 set(DISKANN_UNIT_TEST_SOURCES main.cpp index_write_parameters_builder_tests.cpp)

@@ -49,8 +49,20 @@ lcov --extract coverage_all.info \
   '*/include/neighbor.h' \
   '*/include/parameters.h' \
   '*/include/scratch_uring.h' \
+  '*/include/disk_utils.h' \
+  '*/include/partition.h' \
+  '*/include/pq.h' \
+  '*/include/pq_flash_index_mg_uring.h' \
+  '*/include/io_uring_aligned_file_reader.h' \
+  '*/include/log.h' \
   '*/src/scratch_uring.cpp' \
   '*/src/math_utils.cpp' \
+  '*/src/disk_utils.cpp' \
+  '*/src/partition.cpp' \
+  '*/src/pq.cpp' \
+  '*/src/pq_flash_index_mg_uring.cpp' \
+  '*/src/pq_flash_index.cpp' \
+  '*/src/io_uring_aligned_file_reader.cpp' \
   --output-file coverage_patch_files.info \
   --rc lcov_branch_coverage=1
 
@@ -59,19 +71,21 @@ echo "Removing low-coverage files..."
 lcov --remove coverage_patch_files.info \
   '*/include/aligned_file_reader.h' \
   '*/include/distance.h' \
-  '*/include/pq.h' \
   '*/include/scratch.h' \
   '*/include/utils.h' \
   '*/src/distance.cpp' \
   '*/src/linux_aligned_file_reader.cpp' \
-  '*/src/pq.cpp' \
   '*/src/scratch.cpp' \
   --output-file coverage_patch_files.info \
   --rc lcov_branch_coverage=1
 
-# Generate HTML report for all patch files
-echo "Generating HTML report for all patch files..."
-genhtml coverage_patch_files.info --output-directory coverage_report_all --rc lcov_branch_coverage=1
+# Filter to only include FAST_DISKANN blocks
+echo "Filtering coverage to only FAST_DISKANN blocks..."
+python3 ../filter_fast_diskann_coverage.py coverage_patch_files.info coverage_fast_diskann_only.info .
+
+# Generate HTML report for FAST_DISKANN code only
+echo "Generating HTML report for FAST_DISKANN code only..."
+genhtml coverage_fast_diskann_only.info --output-directory coverage_report_fast_diskann --rc lcov_branch_coverage=1
 
 # Now extract ONLY the lines modified by the patch
 echo ""

@@ -59,6 +59,10 @@ BOOST_AUTO_TEST_CASE(pq_various_configs) {
 
     // Test with 4 chunks
     std::string pivots_file = "/tmp/pq_test_4chunks.bin";
+
+    // Delete old file first to avoid using corrupted cache
+    std::remove(pivots_file.c_str());
+
     int ret = diskann::generate_pq_pivots(data.data(), num_points, dim, 256, 4, 1, pivots_file.c_str(), false);
     BOOST_CHECK_EQUAL(ret, 0);
 
@@ -88,6 +92,10 @@ BOOST_AUTO_TEST_CASE(pq_single_chunk) {
     std::vector<float> data(num_points * dim, 1.5f);
 
     std::string pivots_file = "/tmp/pq_test_1chunk.bin";
+
+    // Delete old file first to avoid using corrupted cache
+    std::remove(pivots_file.c_str());
+
     int ret = diskann::generate_pq_pivots(data.data(), num_points, dim, 256, 1, 1, pivots_file.c_str(), false);
     BOOST_CHECK_EQUAL(ret, 0);
 
