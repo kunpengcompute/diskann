@@ -305,7 +305,11 @@ int main(int argc, char **argv)
                                        program_options_utils::GROUND_TRUTH_FILE_DESCRIPTION);
         optional_configs.add_options()("num_nodes_to_cache", po::value<uint32_t>(&num_nodes_to_cache)->default_value(0),
                                        program_options_utils::NUMBER_OF_NODES_TO_CACHE);
+#ifdef FAST_DISKANN
+        optional_configs.add_options()("beamwidth,W", po::value<uint32_t>(&W)->default_value(1),
+#else
         optional_configs.add_options()("beamwidth,W", po::value<uint32_t>(&W)->default_value(2),
+#endif
                                        program_options_utils::BEAMWIDTH);
 
         // Merge required and optional parameters

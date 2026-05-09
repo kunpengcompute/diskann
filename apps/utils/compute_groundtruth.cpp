@@ -15,7 +15,11 @@
 #include <cstring>
 #include <queue>
 #include <omp.h>
+#ifdef FAST_DISKANN
+#include <cblas.h>
+#else
 #include <mkl.h>
+#endif
 #include <boost/program_options.hpp>
 #include <unordered_map>
 #include <tsl/robin_map.h>

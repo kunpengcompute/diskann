@@ -162,7 +162,11 @@ std::unique_ptr<AbstractIndex> IndexFactory::create_instance(const std::string &
         return create_instance<int8_t>(tag_type, label_type);
     }
     else
+#ifdef FAST_DISKANN
+        throw ANNException("Error: unsupported data_type please choose from [float/int8/uint8/float16]", -1);
+#else
         throw ANNException("Error: unsupported data_type please choose from [float/int8/uint8]", -1);
+#endif
 }
 
 template <typename data_type>
@@ -203,6 +207,14 @@ std::unique_ptr<AbstractIndex> IndexFactory::create_instance(const std::string &
         throw ANNException("Error: unsupported label_type please choose from [uint/ushort]", -1);
 }
 
+#ifdef FAST_DISKANN
+template DISKANN_DLLEXPORT std::shared_ptr<AbstractDataStore<uint8_t>> IndexFactory::construct_datastore(
+    DataStoreStrategy stratagy, size_t num_points, size_t dimension, Metric m);
+template DISKANN_DLLEXPORT std::shared_ptr<AbstractDataStore<int8_t>> IndexFactory::construct_datastore(
+    DataStoreStrategy stratagy, size_t num_points, size_t dimension, Metric m);
+template DISKANN_DLLEXPORT std::shared_ptr<AbstractDataStore<float>> IndexFactory::construct_datastore(
+    DataStoreStrategy stratagy, size_t num_points, size_t dimension, Metric m);
+#else
 // template DISKANN_DLLEXPORT std::shared_ptr<AbstractDataStore<uint8_t>> IndexFactory::construct_datastore(
 //     DataStoreStrategy stratagy, size_t num_points, size_t dimension, Metric m);
 // template DISKANN_DLLEXPORT std::shared_ptr<AbstractDataStore<int8_t>> IndexFactory::construct_datastore(
@@ -210,4 +222,5 @@ std::unique_ptr<AbstractIndex> IndexFactory::create_instance(const std::string &
 // template DISKANN_DLLEXPORT std::shared_ptr<AbstractDataStore<float>> IndexFactory::construct_datastore(
 //     DataStoreStrategy stratagy, size_t num_points, size_t dimension, Metric m);
 
+#endif
 } // namespace diskann

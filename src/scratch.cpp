@@ -90,7 +90,17 @@ template <typename T> void SSDQueryScratch<T>::reset()
     sector_idx = 0;
     visited.clear();
     retset.clear();
+#ifdef FAST_DISKANN
+    retset_lb.clear();
+#endif
     full_retset.clear();
+#ifdef FAST_DISKANN
+    pool.clear();
+    edges_buffer.clear();
+    cb_async.clear();
+    cbs_async.clear();
+    evts_async.clear();
+#endif
 }
 
 template <typename T> SSDQueryScratch<T>::SSDQueryScratch(size_t aligned_dim, size_t visited_reserve)
@@ -109,6 +119,13 @@ template <typename T> SSDQueryScratch<T>::SSDQueryScratch(size_t aligned_dim, si
 
     visited.reserve(visited_reserve);
     full_retset.reserve(visited_reserve);
+#ifdef FAST_DISKANN
+    edges_buffer.reserve(defaults::MAX_GRAPH_DEGREE);
+
+    cb_async.resize(defaults::MAX_N_SECTOR_READS);
+    cbs_async.resize(defaults::MAX_N_SECTOR_READS);
+    evts_async.resize(defaults::MAX_N_SECTOR_READS);
+#endif
 }
 
 template <typename T> SSDQueryScratch<T>::~SSDQueryScratch()
@@ -117,7 +134,11 @@ template <typename T> SSDQueryScratch<T>::~SSDQueryScratch()
     diskann::aligned_free((void *)sector_scratch);
     diskann::aligned_free((void *)this->_aligned_query_T);
 
+#ifdef FAST_DISKANN
+    delete this->_pq_scratch;
+#else
     delete[] this->_pq_scratch;
+#endif
 }
 
 template <typename T>
@@ -147,10 +168,20 @@ template <typename T> void PQScratch<T>::initialize(size_t dim, const T *query, 
 {
     for (size_t d = 0; d < dim; ++d)
     {
-        if (norm != 1.0f)
+#ifdef FAST_DISKANN
+        float q = pq_cast_to_float<T>(query[d]);
+
+        if (norm != 1.0f && norm != 0.0f)
+            q /= norm;
+
+        rotated_query[d] = q;
+        aligned_query_float[d] = q;
+#else
+        if (norm != 1.0f && norm != 0.0f)
             rotated_query[d] = aligned_query_float[d] = static_cast<float>(query[d]) / norm;
         else
             rotated_query[d] = aligned_query_float[d] = static_cast<float>(query[d]);
+#endif
     }
 }
 

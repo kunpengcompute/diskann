@@ -372,7 +372,9 @@ void Index<T, TagT, LabelT>::save(const char *filename, bool compact_before_save
         delete_file(graph_file);
         save_graph(graph_file);
         delete_file(data_file);
+#ifndef FAST_DISKANN
         save_data(data_file);
+#endif
         delete_file(tags_file);
         save_tags(tags_file);
         delete_file(delete_list_file);
@@ -3268,7 +3270,11 @@ void Index<T, TagT, LabelT>::search_with_optimized_layout(const T *query, size_t
         uint32_t id = init_ids[i];
         if (id >= _nd)
             continue;
+#ifdef FAST_DISKANN
+        __builtin_prefetch(_opt_graph + _node_size * id, 0, 3);
+#else
         _mm_prefetch(_opt_graph + _node_size * id, _MM_HINT_T0);
+#endif
     }
     L = 0;
     for (uint32_t i = 0; i < init_ids.size(); i++)
@@ -3289,12 +3295,20 @@ void Index<T, TagT, LabelT>::search_with_optimized_layout(const T *query, size_t
     {
         auto nbr = retset.closest_unexpanded();
         auto n = nbr.id;
+#ifdef FAST_DISKANN
+        __builtin_prefetch(_opt_graph + _node_size * n + _data_len, 0, 3);
+#else
         _mm_prefetch(_opt_graph + _node_size * n + _data_len, _MM_HINT_T0);
+#endif
         neighbors = (uint32_t *)(_opt_graph + _node_size * n + _data_len);
         uint32_t MaxM = *neighbors;
         neighbors++;
         for (uint32_t m = 0; m < MaxM; ++m)
+#ifdef FAST_DISKANN
+            __builtin_prefetch(_opt_graph + _node_size * neighbors[m], 0, 3);
+#else
             _mm_prefetch(_opt_graph + _node_size * neighbors[m], _MM_HINT_T0);
+#endif
         for (uint32_t m = 0; m < MaxM; ++m)
         {
             uint32_t id = neighbors[m];
