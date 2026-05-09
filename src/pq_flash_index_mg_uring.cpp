@@ -99,16 +99,41 @@ template <typename T, typename LabelT>
 void PQFlashIndexMGV2<T, LabelT>::setup_thread_data(uint64_t nthreads, uint64_t visited_reserve)
 {
     diskann::cout << "Setting up thread-specific contexts for nthreads: " << nthreads << std::endl;
-// omp parallel for to generate unique thread IDs
 #pragma omp parallel for num_threads((int)nthreads)
     for (int64_t thread = 0; thread < (int64_t)nthreads; thread++)
     {
 #pragma omp critical
         {
-            SSDThreadDataV2<T> *data = new SSDThreadDataV2<T>(this->_aligned_dim, visited_reserve);
-            this->_thread_data_v2.push(data);
+            // Create V2 thread data (without ctx for now, as it's not used in current code path)
+            SSDThreadDataV2<T> *data_v2 = new SSDThreadDataV2<T>(this->_aligned_dim, visited_reserve);
+            this->_thread_data_v2.push(data_v2);
+
+            // Create regular thread data for compatibility with read_nodes
+            // Only register with this->reader (the parent class reader), not reader_v2
+            SSDThreadData<T> *data = new SSDThreadData<T>(this->_aligned_dim, visited_reserve);
+            this->reader->register_thread();
+            data->ctx = this->reader->get_ctx();
+            this->_thread_data.push(data);
         }
     }
+
+    // Fallback: if OpenMP didn't execute, do it manually
+    if (this->_thread_data_v2.size() == 0)
+    {
+        for (uint64_t thread = 0; thread < nthreads; thread++)
+        {
+            // Create V2 thread data
+            SSDThreadDataV2<T> *data_v2 = new SSDThreadDataV2<T>(this->_aligned_dim, visited_reserve);
+            this->_thread_data_v2.push(data_v2);
+
+            // Create regular thread data for compatibility with read_nodes
+            SSDThreadData<T> *data = new SSDThreadData<T>(this->_aligned_dim, visited_reserve);
+            this->reader->register_thread();
+            data->ctx = this->reader->get_ctx();
+            this->_thread_data.push(data);
+        }
+    }
+
     this->_load_flag = true;
 }
 
@@ -390,6 +415,8 @@ int PQFlashIndexMGV2<T, LabelT>::load_from_separate_paths(uint32_t num_threads, 
     // open AlignedFileReaderV2 handle to index_file
     std::string index_fname(this->_disk_index_file);
     reader_v2->open(index_fname, false, false);
+    // Also open the parent class reader for compatibility with read_nodes
+    this->reader->open(index_fname);
     this->setup_thread_data(num_threads);
     this->_max_nthreads = num_threads;
 

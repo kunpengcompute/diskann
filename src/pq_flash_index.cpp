@@ -121,7 +121,6 @@ template <typename T, typename LabelT>
 void PQFlashIndex<T, LabelT>::setup_thread_data(uint64_t nthreads, uint64_t visited_reserve)
 {
     diskann::cout << "Setting up thread-specific contexts for nthreads: " << nthreads << std::endl;
-// omp parallel for to generate unique thread IDs
 #pragma omp parallel for num_threads((int)nthreads)
     for (int64_t thread = 0; thread < (int64_t)nthreads; thread++)
     {
@@ -133,6 +132,19 @@ void PQFlashIndex<T, LabelT>::setup_thread_data(uint64_t nthreads, uint64_t visi
             this->_thread_data.push(data);
         }
     }
+
+    // Fallback: if OpenMP didn't execute, do it manually
+    if (this->_thread_data.size() == 0)
+    {
+        for (uint64_t thread = 0; thread < nthreads; thread++)
+        {
+            SSDThreadData<T> *data = new SSDThreadData<T>(this->_aligned_dim, visited_reserve);
+            this->reader->register_thread();
+            data->ctx = this->reader->get_ctx();
+            this->_thread_data.push(data);
+        }
+    }
+
     _load_flag = true;
 }
 

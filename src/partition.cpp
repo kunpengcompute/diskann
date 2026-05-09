@@ -106,7 +106,7 @@ void gen_random_slice(const std::string data_file, double p_val, float *&sampled
 #ifdef FAST_DISKANN
     std::ifstream base_reader(data_file.c_str(), std::ios::binary | std::ios::in);
     if (!base_reader.is_open())
-        throw std::runtime_error("[Debug] Failed to open T data file: " + data_file);
+        throw std::runtime_error("Failed to open data file: " + data_file);
 
     // metadata: npts, ndims
     base_reader.read((char *)&npts32, sizeof(uint32_t));
@@ -118,13 +118,8 @@ void gen_random_slice(const std::string data_file, double p_val, float *&sampled
     const uint64_t actual_file_size = get_file_size(data_file);
     if (expected_file_size != actual_file_size)
     {
-        throw std::runtime_error("[Debug] File size mismatch for file: " + data_file + ". Expected: " +
+        throw std::runtime_error("File size mismatch for file: " + data_file + ". Expected: " +
                                  std::to_string(expected_file_size) + " Actual: " + std::to_string(actual_file_size));
-    }
-    else
-    {
-        diskann::cout << "[Debug] File size match for file: " << data_file << ". Expected: " << expected_file_size
-                      << " Actual: " << actual_file_size << std::endl;
     }
 
     std::unique_ptr<T[]> cur_vector_T = std::make_unique<T[]>(ndims);
@@ -135,7 +130,6 @@ void gen_random_slice(const std::string data_file, double p_val, float *&sampled
     std::mt19937 generator((uint32_t)x);
     std::uniform_real_distribution<float> distribution(0, 1);
 
-    bool print = true;
     for (size_t i = 0; i < npts; i++)
     {
         float rnd_val = distribution(generator);
@@ -148,23 +142,13 @@ void gen_random_slice(const std::string data_file, double p_val, float *&sampled
             for (size_t d = 0; d < ndims; d++)
                 cur_vector_float.push_back(cur_vector_T[d]);
             sampled_vectors.push_back(cur_vector_float);
-            if (print)
-            {
-                diskann::cout << "[Debug] gen_random_slice<T> print 1st vector from file : ";
-                for (size_t d = 0; d < ndims; d++)
-                {
-                    diskann::cout << cur_vector_float[d] << " ";
-                }
-                print = false;
-                diskann::cout << std::endl;
-            }
         }
         else
         {
             base_reader.seekg(row_bytes, std::ios::cur);
         }
         if (!base_reader)
-            throw std::runtime_error("Error while reading T row in file");
+            throw std::runtime_error("Error while reading row in file");
     }
     slice_size = sampled_vectors.size();
     sampled_data = new float[slice_size * ndims];
@@ -175,7 +159,6 @@ void gen_random_slice(const std::string data_file, double p_val, float *&sampled
             sampled_data[i * ndims + j] = sampled_vectors[i][j];
         }
     }
-    diskann::cout << "[Debug] gen_random_slice<T> done." << std::endl;
 #else
     // amount to read in one shot
     size_t read_blk_size = 64 * 1024 * 1024;
@@ -678,7 +661,9 @@ int partition_with_ram_budget(const std::string data_file, const double sampling
         size_t test_dim;
         size_t num_test;
         float *test_data_float;
+        diskann::cout << "[DEBUG] Before gen_random_slice for test data" << std::endl;
         gen_random_slice<T>(data_file, sampling_rate, test_data_float, num_test, test_dim);
+        diskann::cout << "[DEBUG] After gen_random_slice for test data, num_test=" << num_test << " test_dim=" << test_dim << std::endl;
 
         float *pivot_data = nullptr;
 
@@ -690,6 +675,7 @@ int partition_with_ram_budget(const std::string data_file, const double sampling
         //  std::to_string(num_parts);
         output_file = cur_file + "_centroids.bin";
 
+        diskann::cout << "[DEBUG] Before while loop, fit_in_ram=" << fit_in_ram << " num_parts=" << num_parts << std::endl;
         while (!fit_in_ram)
         {
             fit_in_ram = true;
@@ -698,13 +684,19 @@ int partition_with_ram_budget(const std::string data_file, const double sampling
             if (pivot_data != nullptr)
                 delete[] pivot_data;
 
+            diskann::cout << "[DEBUG] Before allocate pivot_data, num_parts=" << num_parts << " train_dim=" << train_dim << std::endl;
             pivot_data = new float[num_parts * train_dim];
+            diskann::cout << "[DEBUG] After allocate pivot_data" << std::endl;
             // Process Global k-means for kmeans_partitioning Step
             diskann::cout << "Processing global k-means (kmeans_partitioning Step)" << std::endl;
+            diskann::cout << "[DEBUG] Before kmeanspp_selecting_pivots" << std::endl;
             kmeans::kmeanspp_selecting_pivots(train_data_float, num_train, train_dim, pivot_data, num_parts);
+            diskann::cout << "[DEBUG] After kmeanspp_selecting_pivots" << std::endl;
 
+            diskann::cout << "[DEBUG] Before run_lloyds" << std::endl;
             kmeans::run_lloyds(train_data_float, num_train, train_dim, pivot_data, num_parts, max_k_means_reps, NULL,
                                NULL);
+            diskann::cout << "[DEBUG] After run_lloyds" << std::endl;
 
             // now pivots are ready. need to stream base points and assign them to
             // closest clusters.
@@ -736,14 +728,22 @@ int partition_with_ram_budget(const std::string data_file, const double sampling
         diskann::cout << "Saving global k-center pivots" << std::endl;
         diskann::save_bin<float>(output_file.c_str(), pivot_data, (size_t)num_parts, train_dim);
 
+        diskann::cout << "[DEBUG] Before shard_data_into_clusters_only_ids" << std::endl;
         shard_data_into_clusters_only_ids<T>(data_file, pivot_data, num_parts, train_dim, k_base, prefix_path);
+        diskann::cout << "[DEBUG] After shard_data_into_clusters_only_ids" << std::endl;
 
         float num_parts_float = num_parts;
+        diskann::cout << "[DEBUG] Before save clusters_num.bin" << std::endl;
         diskann::save_bin<float>(clusters_num_data_path.c_str(), &num_parts_float, (size_t)1, (size_t)1);
+        diskann::cout << "[DEBUG] After save clusters_num.bin" << std::endl;
 
+        diskann::cout << "[DEBUG] Before delete pivot_data" << std::endl;
         delete[] pivot_data;
+        diskann::cout << "[DEBUG] Before delete train_data_float" << std::endl;
         delete[] train_data_float;
+        diskann::cout << "[DEBUG] Before delete test_data_float" << std::endl;
         delete[] test_data_float;
+        diskann::cout << "[DEBUG] After all deletes" << std::endl;
     }
     return num_parts;
 #else
