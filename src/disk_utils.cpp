@@ -1031,9 +1031,10 @@ void create_disk_layout(const std::string base_file, const std::string mem_index
         throw diskann::ANNException(stream.str(), -1, __FUNCSIG__, __FILE__, __LINE__);
     }
 #ifdef FAST_DISKANN
-}
+    uint64_t vamana_frozen_num = 0, vamana_frozen_loc = 0;
 #else
     uint64_t vamana_frozen_num = false, vamana_frozen_loc = 0;
+#endif
 
     vamana_reader.read((char *)&width_u32, sizeof(uint32_t));
     vamana_reader.read((char *)&medoid_u32, sizeof(uint32_t));
@@ -1220,10 +1221,10 @@ void create_disk_layout(const std::string base_file, const std::string mem_index
     diskann::save_bin<uint64_t>(output_file, output_file_meta.data(), output_file_meta.size(), 1, 0);
     diskann::cout << "Output disk index file written to " << output_file << std::endl;
 }
-#endif
 
 #ifdef FAST_DISKANN
-int compress_vamana_graph(std::string mem_index_file) {
+DISKANN_DLLEXPORT int compress_vamana_graph(const char* mem_index_file_cstr) {
+    std::string mem_index_file(mem_index_file_cstr);
     std::string compressed_graph_file_path = mem_index_file + ".vamana.comp";
     std::ifstream vamana_reader(mem_index_file, std::ios::binary);
 
@@ -1557,7 +1558,7 @@ int build_disk_index(const char *dataFilePath, const char *indexFilePath, const 
 
 #ifdef FAST_DISKANN
     if (generate_mem_file) {
-        compress_vamana_graph(mem_index_path);
+        compress_vamana_graph(mem_index_path.c_str());
     }
 #endif
     double ten_percent_points = std::ceil(points_num * 0.1);
