@@ -22,6 +22,9 @@ const char *DATA_TYPE_DESCRIPTION = "data type, one of {int8, uint8, float} - fl
 const char *DISTANCE_FUNCTION_DESCRIPTION =
     "distance function {l2, mips, fast_l2, cosine}.  'fast l2' and 'mips' only support data_type float";
 const char *INDEX_PATH_PREFIX_DESCRIPTION = "Path prefix to the index, e.g. '/mnt/data/my_ann_index'";
+#ifdef FAST_DISKANN
+const char *MEM_GRAPH_PATH_DESCRIPTION = "Path to the nsg-like format memory graph, e.g. '/mnt/data/sift.nsg'";
+#endif
 const char *RESULT_PATH_DESCRIPTION =
     "Path prefix for saving results of the queries, e.g. '/mnt/data/query_file_X.bin'";
 const char *QUERY_FILE_DESCRIPTION = "Query file in binary format, e.g. '/mnt/data/query_file_X.bin'";
@@ -33,6 +36,10 @@ const char *SEARCH_LIST_DESCRIPTION =
     "to L in the DiskANN white paper.";
 const char *INPUT_DATA_PATH = "Input data file in bin format.  This is the file you want to build the index over.  "
                               "File format:  Shape of the vector followed by the vector of embeddings as binary data.";
+#ifdef FAST_DISKANN
+const char *MODEL_PATH = "Path to the model file for filtering useless I/O requests during search.";
+const char *FEATURES_PATH = "Path to the features file for model input.";
+#endif
 
 // Optional parameters
 const char *FILTER_LABEL_DESCRIPTION =
@@ -59,6 +66,9 @@ const char *FAIL_IF_RECALL_BELOW =
 
 const char *NUMBER_OF_NODES_TO_CACHE = "Number of BFS nodes around medoid(s) to cache.  Default value: 0";
 const char *BEAMWIDTH = "Beamwidth for search. Set 0 to optimize internally.  Default value: 2";
+#ifdef FAST_DISKANN
+const char *REORDER_RATIO = "Controls the number of real distance computations. The default value is 2, meaning the algorithm will calculate distances for k * REORDER_RATIO elements.";
+#endif
 const char *MAX_BUILD_DEGREE = "Maximum graph degree";
 const char *GRAPH_BUILD_COMPLEXITY =
     "Size of the search working set during build time.  This is the numer of neighbor/distance pairs to keep in memory "

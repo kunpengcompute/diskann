@@ -33,6 +33,23 @@ struct QueryStats
     unsigned n_cmps = 0;       // # cmps
     unsigned n_cache_hits = 0; // # cache_hits
     unsigned n_hops = 0;       // # search hops
+#ifdef FAST_DISKANN
+    unsigned n_ios_preload = 0;
+    unsigned n_ios_preload_hits = 0;
+    unsigned pruned_ios = 0;             // # of IOs pruned by ML model
+    unsigned n_overflow_queries = 0;     // # of queries that overflowed the IO limit
+
+
+    float preprocess_us = 0;             // total time before entering greedy search
+    float cache_quant_compute_us = 0;    // total time spent on pq compute on cached nodes
+    float cache_acc_compute_us = 0;      // total time spent on accurate distance compute on cached nodes
+    float disk_req_prepare_us = 0;       // total time of preparing for read requests
+    float disk_req_submit_us = 0;        // total time of submitting the read requests
+    float disk_req_wait_us = 0;          // total time of waiting for read requests to be ready
+    float disk_req_quant_compute_us = 0; // total time spent on pq compute on read nodes
+    float disk_req_acc_compute_us = 0;   // total time spent on accurate distance compute on read nodes
+    float postprocess_us = 0;            // postprocess after greedy search
+#endif
 };
 
 template <typename T>

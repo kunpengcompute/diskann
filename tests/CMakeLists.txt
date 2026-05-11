@@ -32,10 +32,46 @@ if (NOT Boost_FOUND)
 endif()
 
 
+if(FAST_DISKANN)
+set(DISKANN_UNIT_TEST_SOURCES
+    main.cpp
+    index_write_parameters_builder_tests.cpp
+    patch_apis_tests.cpp
+    io_uring_reader_tests.cpp
+    linux_reader_tests.cpp
+    disk_utils_tests.cpp
+    pq_tests.cpp
+    utils_tests.cpp
+    scratch_uring_tests.cpp
+    math_utils_tests.cpp
+    ann_exception_tests.cpp
+    distance_tests.cpp
+    end_to_end_tests.cpp
+    additional_coverage_tests.cpp
+    compress_vamana_tests.cpp
+    pq_neon_tests.cpp
+    partition_fast_tests.cpp
+    pq_flash_index_integration_tests.cpp
+    simple_pq_coverage_tests.cpp
+    pq_flash_index_coverage_tests.cpp
+    pq_flash_index_mg_coverage_tests.cpp
+)
+else()
 set(DISKANN_UNIT_TEST_SOURCES main.cpp index_write_parameters_builder_tests.cpp)
+endif()
 
 add_executable(${PROJECT_NAME}_unit_tests ${DISKANN_SOURCES} ${DISKANN_UNIT_TEST_SOURCES})
+
+if(FAST_DISKANN)
+set(TEST_LINK_LIBS ${PROJECT_NAME} ${DISKANN_TOOLS_TCMALLOC_LINK_OPTIONS} Boost::unit_test_framework)
+# Add aio library on Linux
+if(UNIX AND NOT APPLE)
+    list(APPEND TEST_LINK_LIBS aio)
+endif()
+target_link_libraries(${PROJECT_NAME}_unit_tests ${TEST_LINK_LIBS})
+else()
 target_link_libraries(${PROJECT_NAME}_unit_tests ${PROJECT_NAME} ${DISKANN_TOOLS_TCMALLOC_LINK_OPTIONS} Boost::unit_test_framework)
+endif()
 
 add_test(NAME ${PROJECT_NAME}_unit_tests COMMAND ${PROJECT_NAME}_unit_tests)
 

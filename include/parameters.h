@@ -22,15 +22,28 @@ class IndexWriteParameters
     const uint32_t max_occlusion_size; // C
     const float alpha;
     const uint32_t num_threads;
+#ifdef FAST_DISKANN
+    const uint32_t filter_list_size;    // Lf
+    const PruneStrategy prune_strategy; // strategy for pruning candidates
+#else
     const uint32_t filter_list_size; // Lf
+#endif
 
   private:
     IndexWriteParameters(const uint32_t search_list_size, const uint32_t max_degree, const bool saturate_graph,
                          const uint32_t max_occlusion_size, const float alpha, const uint32_t num_threads,
+#ifdef FAST_DISKANN
+                         const uint32_t filter_list_size, const PruneStrategy prune_strategy = defaults::PRUNE_STRATEGY)
+#else
                          const uint32_t filter_list_size)
+#endif
         : search_list_size(search_list_size), max_degree(max_degree), saturate_graph(saturate_graph),
           max_occlusion_size(max_occlusion_size), alpha(alpha), num_threads(num_threads),
+#ifdef FAST_DISKANN
+          filter_list_size(filter_list_size), prune_strategy(prune_strategy)
+#else
           filter_list_size(filter_list_size)
+#endif
     {
     }
 
@@ -92,10 +105,23 @@ class IndexWriteParametersBuilder
         return *this;
     }
 
+#ifdef FAST_DISKANN
+    IndexWriteParametersBuilder &with_prune_strategy(const PruneStrategy strategy)
+    {
+        _prune_strategy = strategy;
+        return *this;
+    }
+#endif
+
     IndexWriteParameters build() const
     {
+#ifdef FAST_DISKANN
+        return IndexWriteParameters(_search_list_size, _max_degree, _saturate_graph, _max_occlusion_size, _alpha,
+                                    _num_threads, _filter_list_size, _prune_strategy);
+#else
         return IndexWriteParameters(_search_list_size, _max_degree, _saturate_graph, _max_occlusion_size, _alpha,
                                     _num_threads, _filter_list_size);
+#endif
     }
 
     IndexWriteParametersBuilder(const IndexWriteParameters &wp)
@@ -115,6 +141,9 @@ class IndexWriteParametersBuilder
     float _alpha{defaults::ALPHA};
     uint32_t _num_threads{defaults::NUM_THREADS};
     uint32_t _filter_list_size{defaults::FILTER_LIST_SIZE};
+#ifdef FAST_DISKANN
+    PruneStrategy _prune_strategy{defaults::PRUNE_STRATEGY};
+#endif
 };
 
 } // namespace diskann

@@ -26,7 +26,11 @@ int main(int argc, char **argv)
     if (argc != 5)
     {
         std::cout << argv[0]
+#ifdef FAST_DISKANN
+                  << " data_type <float/int8/uint8/float16> data_bin "
+#else
                   << " data_type <float/int8/uint8> data_bin "
+#endif
                      "vamana_index_file output_diskann_index_file"
                   << std::endl;
         exit(-1);
@@ -41,7 +45,11 @@ int main(int argc, char **argv)
         ret_val = create_disk_layout<uint8_t>(argv);
     else
     {
+#ifdef FAST_DISKANN
+        std::cout << "unsupported type. use int8/uint8/float/float16 " << std::endl;
+#else
         std::cout << "unsupported type. use int8/uint8/float " << std::endl;
+#endif
         ret_val = -2;
     }
     return ret_val;

@@ -19,9 +19,45 @@
 cmake_minimum_required(VERSION 3.15)
 project(diskann)
 
+option(FAST_DISKANN "Enable FAST_DISKANN optimizations" OFF)
+
 set(CMAKE_STANDARD 17)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+if(FAST_DISKANN)
+# FAST_DISKANN configuration
+message(STATUS "FAST_DISKANN mode enabled")
+add_definitions(-DFAST_DISKANN)
+
+# Enable OpenMP for multi-threaded k-means
+find_package(OpenMP REQUIRED)
+if(OpenMP_CXX_FOUND)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
+    message(STATUS "OpenMP enabled")
+endif()
+
+string(TOLOWER "${CMAKE_SYSTEM_PROCESSOR}" SYSTEM_ARCH)
+message(STATUS "Architecture: ${SYSTEM_ARCH}")
+
+link_libraries(uring)
+
+if(SYSTEM_ARCH MATCHES "^(armv7|aarch64|arm)")
+    message(STATUS "Including ARM CMake configuration")
+    add_definitions(-D_ARM)
+    include(${CMAKE_SOURCE_DIR}/cmake/arm_platform/CMakeLists.txt)
+elseif(SYSTEM_ARCH MATCHES "^(x86_64|amd64|i[3-6]86)")
+    message(STATUS "Including x86 CMake configuration")
+    add_definitions(-D_X86)
+    include(${CMAKE_SOURCE_DIR}/cmake/x86_platform/CMakeLists.txt)
+else()
+    message(FATAL_ERROR "Unsupported architecture: ${SYSTEM_ARCH}")
+endif()
+
+else()
+# Original DiskANN configuration
 
 if(NOT MSVC)
 	set(CMAKE_CXX_COMPILER g++)
@@ -331,3 +367,5 @@ include(clang-format.cmake)
 if(PYBIND)
     add_subdirectory(python)
 endif()
+
+endif() # FAST_DISKANN

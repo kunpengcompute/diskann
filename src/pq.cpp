@@ -593,12 +593,17 @@ int generate_pq_pivots(const float *const passed_train_data, size_t num_train, u
 
     std::vector<size_t> cumul_bytes(4, 0);
     cumul_bytes[0] = METADATA_SIZE;
-    cumul_bytes[1] = cumul_bytes[0] + diskann::save_bin<float>(pq_pivots_path.c_str(), full_pivot_data.get(),
-                                                               (size_t)num_centers, dim, cumul_bytes[0]);
-    cumul_bytes[2] = cumul_bytes[1] +
-                     diskann::save_bin<float>(pq_pivots_path.c_str(), centroid.get(), (size_t)dim, 1, cumul_bytes[1]);
+
+    size_t bytes_written_1 = diskann::save_bin<float>(pq_pivots_path.c_str(), full_pivot_data.get(),
+                                                       (size_t)num_centers, dim, cumul_bytes[0]);
+    cumul_bytes[1] = cumul_bytes[0] + bytes_written_1;
+
+    size_t bytes_written_2 = diskann::save_bin<float>(pq_pivots_path.c_str(), centroid.get(), (size_t)dim, 1, cumul_bytes[1]);
+    cumul_bytes[2] = cumul_bytes[1] + bytes_written_2;
+
     cumul_bytes[3] = cumul_bytes[2] + diskann::save_bin<uint32_t>(pq_pivots_path.c_str(), chunk_offsets.data(),
                                                                   chunk_offsets.size(), 1, cumul_bytes[2]);
+
     diskann::save_bin<size_t>(pq_pivots_path.c_str(), cumul_bytes.data(), cumul_bytes.size(), 1, 0);
 
     diskann::cout << "Saved pq pivot data to " << pq_pivots_path << " of size " << cumul_bytes[cumul_bytes.size() - 1]

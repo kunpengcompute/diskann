@@ -21,6 +21,9 @@ int main(int argc, char **argv)
     float B, M;
     bool append_reorder_data = false;
     bool use_opq = false;
+#ifdef FAST_DISKANN
+    bool generate_mem_file = false;
+#endif
 
     po::options_description desc{
         program_options_utils::make_program_description("build_disk_index", "Build a disk-based index.")};
@@ -43,6 +46,10 @@ int main(int argc, char **argv)
                                        "compressed level for data while search happens");
         required_configs.add_options()("build_DRAM_budget,M", po::value<float>(&M)->required(),
                                        "DRAM budget in GB for building the index");
+#ifdef FAST_DISKANN
+        required_configs.add_options()("generate_mem_file,GMF", po::value<bool>(&generate_mem_file)->required(),
+                                       "generate graph adjacency list file for search");
+#endif
 
         // Optional parameters
         po::options_description optional_configs("Optional");
@@ -146,15 +153,27 @@ int main(int argc, char **argv)
             if (data_type == std::string("int8"))
                 return diskann::build_disk_index<int8_t>(data_path.c_str(), index_path_prefix.c_str(), params.c_str(),
                                                          metric, use_opq, codebook_prefix, use_filters, label_file,
+#ifdef FAST_DISKANN
+                                                         universal_label, filter_threshold, Lf, generate_mem_file);
+#else
                                                          universal_label, filter_threshold, Lf);
+#endif
             else if (data_type == std::string("uint8"))
                 return diskann::build_disk_index<uint8_t, uint16_t>(
                     data_path.c_str(), index_path_prefix.c_str(), params.c_str(), metric, use_opq, codebook_prefix,
+#ifdef FAST_DISKANN
+                    use_filters, label_file, universal_label, filter_threshold, Lf, generate_mem_file);
+#else
                     use_filters, label_file, universal_label, filter_threshold, Lf);
+#endif
             else if (data_type == std::string("float"))
                 return diskann::build_disk_index<float, uint16_t>(
                     data_path.c_str(), index_path_prefix.c_str(), params.c_str(), metric, use_opq, codebook_prefix,
+#ifdef FAST_DISKANN
+                    use_filters, label_file, universal_label, filter_threshold, Lf, generate_mem_file);
+#else
                     use_filters, label_file, universal_label, filter_threshold, Lf);
+#endif
             else
             {
                 diskann::cerr << "Error. Unsupported data type" << std::endl;
@@ -166,15 +185,27 @@ int main(int argc, char **argv)
             if (data_type == std::string("int8"))
                 return diskann::build_disk_index<int8_t>(data_path.c_str(), index_path_prefix.c_str(), params.c_str(),
                                                          metric, use_opq, codebook_prefix, use_filters, label_file,
+#ifdef FAST_DISKANN
+                                                         universal_label, filter_threshold, Lf, generate_mem_file);
+#else
                                                          universal_label, filter_threshold, Lf);
+#endif
             else if (data_type == std::string("uint8"))
                 return diskann::build_disk_index<uint8_t>(data_path.c_str(), index_path_prefix.c_str(), params.c_str(),
                                                           metric, use_opq, codebook_prefix, use_filters, label_file,
+#ifdef FAST_DISKANN
+                                                          universal_label, filter_threshold, Lf, generate_mem_file);
+#else
                                                           universal_label, filter_threshold, Lf);
+#endif
             else if (data_type == std::string("float"))
                 return diskann::build_disk_index<float>(data_path.c_str(), index_path_prefix.c_str(), params.c_str(),
                                                         metric, use_opq, codebook_prefix, use_filters, label_file,
+#ifdef FAST_DISKANN
+                                                        universal_label, filter_threshold, Lf, generate_mem_file);
+#else
                                                         universal_label, filter_threshold, Lf);
+#endif
             else
             {
                 diskann::cerr << "Error. Unsupported data type" << std::endl;
