@@ -1,0 +1,113 @@
+# API参考
+
+本文档详细说明鲲鹏优化相对于原始DiskANN开源代码的接口变动，仅对对外接口build_disk_index与search_disk_index做参数新增。
+
+## build_disk_index
+
+### 定义
+ 
+```cpp
+template <typename T, typename LabelT>
+int build_disk_index(
+    const char *dataFilePath,
+    const char *indexFilePath,
+    const char *indexBuildParameters,
+    diskann::Metric compareMetric,
+    bool use_opq,
+    const std::string &codebook_prefix,
+    bool use_filters,
+    const std::string &label_file,
+    const std::string &universal_label,
+    const uint32_t filter_threshold,
+    const uint32_t Lf,
+    const bool generate_mem_file
+);
+```
+ 
+### 用途
+ 
+构建索引，生成 PQ 表、IO 友好的完整向量等文件。
+ 
+### 参数说明
+ 
+| 参数名称 | 数据类型 | 描述 | 取值范围 |
+|---|---|---|---|
+| `dataFilePath` | `std::string` | 输入数据集文件，二进制形式。 | 非空，真实路径 |
+| `indexFilePath` | `std::string` | 输出，索引路径前缀，如 `/mnt/data/my_ann_index`。 | 非空，真实路径 |
+| `indexBuildParameters` | `std::string` | 输入参数组合，包括图邻居数 R、search 节点候选队列长度 L、search 阶段内存预算 B、构建内存预算 M、线程数 num_threads、PQ 索引字节数 disk_PQ、是否在数据文件中包含全精度数据 reorder、构建索引的字节数 PQ、PQ 量化维度 QD。 | 5–9 个由空格隔开的参数组合 |
+| `compareMetric` | `diskann::Metric` | 距离计算函数。 | `{l2, mips, cosine}`，推荐 `l2` |
+| `use_opq` | `bool` | 是否使用 OPQ 算法进行 PQ 计算。 | `{true, false}` |
+| `codebook_prefix` | `std::string` | 预训练码本的路径前缀。 | 默认为空 |
+| `use_filters` | `bool` | 是否进入 filter 分支，由 `universal_label` 决定。 | `{true, false}` |
+| `label_file` | `std::string` | 用于构建过滤索引的标签文件路径（txt 格式）。文件中每行对应一个图节点，包含逗号分隔的过滤器标签。 | 默认为空 |
+| `universal_label` | `std::string` | 通用标签，仅在构建过滤索引时与标签文件结合使用。若某图节点拥有所有相关标签，可为其分配一个特殊的通用过滤器，而无需列出所有标签。通用标签应在标签文件中分配给节点，DiskANN 不会自动分配。 | 默认为空 |
+| `filter_threshold` | `uint32_t` | 每个节点最多拥有的标签数量，超过此值将拆分节点。 | 默认为 0 |
+| `Lf` | `uint32_t` | 构建过滤点的复杂度，更高的值生成更好的图。 | 默认为 0 |
+| `generate_mem_file` | `bool` | **【新增参数】** 是否单独生成内存邻接表。 | `{true, false}` |
+ 
+### 返回值
+ 
+| 返回值 | 说明 |
+|---|---|
+| `0` | 正常返回 |
+| `-1` | 失败 |
+
+---
+
+## search_disk_index
+
+### 定义
+ 
+```cpp
+template <typename T, typename LabelT = uint32_t>
+int search_disk_index(
+    diskann::Metric &metric,
+    const std::string &index_path_prefix,
+    std::string &memory_graph_path,
+    const std::string &result_output_prefix,
+    const std::string &query_file,
+    std::string &gt_file,
+    const uint32_t num_threads,
+    const uint32_t recall_at,
+    const uint32_t beamwidth,
+    const uint32_t num_nodes_to_cache,
+    const uint32_t search_io_limit,
+    const float reorder_ratio,
+    const std::vector<uint32_t> &Lvec,
+    const float fail_if_recall_below,
+    const std::vector<std::string> &query_filters,
+    const bool use_reorder_data = false
+);
+```
+ 
+### 用途
+ 
+并行批量 query 搜索接口，多线程并发执行。加载 PQ 表、内存邻接表等至内存，并在查询时按需进行 IO。
+ 
+### 参数说明
+ 
+| 参数名称 | 数据类型 | 描述 | 取值范围 |
+|---|---|---|---|
+| `metric` | `diskann::Metric` | 距离计算函数。 | `{l2, mips, cosine}`，推荐 `l2` |
+| `index_path_prefix` | `std::string` | 索引路径前缀，如 `/mnt/data/my_ann_index`。 | 非空，真实路径 |
+| `memory_graph_path` | `std::string` | **【新增参数】** 邻接表路径。 | 非空，真实路径 |
+| `result_output_prefix` | `std::string` | 结果输出路径前缀。 | 非空，真实路径 |
+| `query_file` | `std::string` | 批次查询文件路径。 | 非空，真实路径 |
+| `gt_file` | `std::string` | 查询对应的正确结果文件路径，仅验证 recall 时使用。 | 无限制，可以为空 |
+| `num_threads` | `uint32_t` | 线程数。 | 大于 1 的整数，默认为系统参数 |
+| `recall_at` | `uint32_t` | 召回率（输出）。 | 无限制 |
+| `beamwidth` | `uint32_t` | 搜索时一次 load 索引的个数。 | 正整数，默认为 2 |
+| `num_nodes_to_cache` | `uint32_t` | 缓存的节点数量，大于数据集 10% 会自动缩减到 10%；Fast 分支置为 0。 | 自然数，默认为 0 |
+| `search_io_limit` | `uint32_t` | 单个查询的最大 IO 数量。 | 正整数，默认为最大值 |
+| `reorder_ratio` | `float` | **【新增参数】** 控制精确距离计算的次数，有效值为 `reorder_ratio × top-k`。 | 大于 0，默认为 2.0 |
+| `Lvec` | `std::vector<uint32_t>` | 搜索列表的长度，主要控制粗距离计算表的列表。 | 正整数列表 |
+| `fail_if_recall_below` | `float` | recall 可接受的最小值，低于此值返回 -1。 | 0–100，默认为 0 |
+| `query_filters` | `std::vector<std::string>` | 查询的筛选标签。1 个标签对所有查询生效，多个标签与每个查询一一对应（当前不涉及）。 | 无限制，默认为空 |
+| `use_reorder_data` | `bool` | 索引中是否包含全精度数据，仅在 SSD 上与压缩数据结合使用。 | `{true, false}`，默认为 `false` |
+ 
+### 返回值
+ 
+| 返回值 | 说明 |
+|---|---|
+| `0` | 正常返回 |
+| `-1` | 失败（含 recall 低于 `fail_if_recall_below` 的情况） |
