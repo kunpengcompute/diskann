@@ -211,7 +211,7 @@ int main(int argc, char *argv[])
     for (const auto &p : hops_node_pairs)
     {
         const uint32_t node_id = p.second;
-        const uint16_t n_num = static_cast<uint16_t>(neighbors_num[node_id]);
+        const uint16_t n_num = static_cast<uint16_t>(std::min(neighbors_num[node_id], (uint32_t)UINT16_MAX));
         const uint16_t storage_bytes = static_cast<uint16_t>(n_num * 4);
         const uint32_t hops_val = p.first;
 

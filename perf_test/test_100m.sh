@@ -55,7 +55,7 @@ search() {
                     L="150 200 250 300 350 400 450 500"
                 fi
 
-                cmd="numactl -N 0 --membind=0 \
+                cmd="numactl -N 0 -m 0 \
                     $CURRENT_DIR/../build/apps/search_disk_index \
                     --data_type $data_type \
                     --dist_fn $dist_fn \

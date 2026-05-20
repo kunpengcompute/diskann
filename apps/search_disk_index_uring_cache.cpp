@@ -88,8 +88,6 @@ int search_disk_index(diskann::Metric &metric, const std::string &index_path_pre
     else
         diskann::cout << ", io_limit: " << search_io_limit << "." << std::endl;
 
-    std::string warmup_query_file = index_path_prefix + "_sample_data.bin";
-
     T *query = nullptr;
     uint32_t *gt_ids = nullptr;
     float *gt_dists = nullptr;
@@ -164,7 +162,7 @@ int search_disk_index(diskann::Metric &metric, const std::string &index_path_pre
 
     if (cache_budget_gb > 0)
     {
-        const uint64_t cache_budget_bytes = cache_budget_gb * 1024 * 1024 * 1024;
+        const uint64_t cache_budget_bytes = (uint64_t)(cache_budget_gb * 1024ULL * 1024 * 1024);
         const uint64_t graph_cache_budget_bytes =
             _pFlashIndex->cache_graph_by_priority(cache_budget_bytes, effective_priority_file);
         if (graph_cache_budget_bytes < cache_budget_bytes)
@@ -176,9 +174,6 @@ int search_disk_index(diskann::Metric &metric, const std::string &index_path_pre
 
     omp_set_num_threads(num_threads);
 
-    uint64_t warmup_L = 20;
-    uint64_t warmup_num = 0, warmup_dim = 0, warmup_aligned_dim = 0;
-    T *warmup = nullptr;
     {
         double peak_mem_gb = diskann::get_max_rss_gb();
         diskann::cout << "Peak memory usage before cached_beam_search: " << peak_mem_gb << " GB" << std::endl;
@@ -330,7 +325,8 @@ int search_disk_index(diskann::Metric &metric, const std::string &index_path_pre
         auto mean_n_ios_preload_hit = diskann::get_mean_stats<uint32_t>(
             stats, query_num, [](const diskann::QueryStats &stats) { return stats.n_ios_preload_hits; });
 
-        auto io_preload_ratio = (double)mean_n_ios_preload_hit / (double)mean_n_ios_preload * 100.0;
+        auto io_preload_ratio = mean_n_ios_preload > 0
+            ? (double)mean_n_ios_preload_hit / (double)mean_n_ios_preload * 100.0 : 0.0;
 
         auto io_ratio = (double)mean_ious / (double)mean_latency * 100.0;
 
@@ -412,9 +408,6 @@ int search_disk_index(diskann::Metric &metric, const std::string &index_path_pre
     diskann::cout << "Done searching. Now saving results " << std::endl;
 
     diskann::aligned_free(query);
-    if (warmup != nullptr)
-        diskann::aligned_free(warmup);
-
     double peak_mem_gb = diskann::get_max_rss_gb();
     diskann::cout << "Peak memory usage: " << peak_mem_gb << " GB" << std::endl;
 

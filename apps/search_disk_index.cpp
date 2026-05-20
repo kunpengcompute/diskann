@@ -435,7 +435,8 @@ int search_disk_index(diskann::Metric &metric, const std::string &index_path_pre
         auto mean_n_ios_preload_hit = diskann::get_mean_stats<uint32_t>(
             stats, query_num, [](const diskann::QueryStats &stats) { return stats.n_ios_preload_hits; });
 
-        auto io_preload_ratio = (double)mean_n_ios_preload_hit / (double)mean_n_ios_preload * 100.0;
+        auto io_preload_ratio = mean_n_ios_preload > 0
+            ? (double)mean_n_ios_preload_hit / (double)mean_n_ios_preload * 100.0 : 0.0;
 
         auto io_ratio = (double)mean_ious / (double)mean_latency * 100.0;
 
@@ -588,7 +589,7 @@ int search_disk_index_cache(diskann::Metric &metric, const std::string &index_pa
 
     if (cache_budget_gb > 0)
     {
-        const uint64_t cache_budget_bytes = cache_budget_gb * 1024 * 1024 * 1024;
+        const uint64_t cache_budget_bytes = (uint64_t)(cache_budget_gb * 1024ULL * 1024 * 1024);
         const uint64_t graph_cache_budget_bytes =
             _pFlashIndex->cache_graph_by_priority(cache_budget_bytes, effective_priority_file);
         if (graph_cache_budget_bytes < cache_budget_bytes)
@@ -716,7 +717,8 @@ int search_disk_index_cache(diskann::Metric &metric, const std::string &index_pa
             stats, query_num, [](const diskann::QueryStats &stats) { return stats.n_ios_preload; });
         auto mean_n_ios_preload_hit = diskann::get_mean_stats<uint32_t>(
             stats, query_num, [](const diskann::QueryStats &stats) { return stats.n_ios_preload_hits; });
-        auto io_preload_ratio = (double)mean_n_ios_preload_hit / (double)mean_n_ios_preload * 100.0;
+        auto io_preload_ratio = mean_n_ios_preload > 0
+            ? (double)mean_n_ios_preload_hit / (double)mean_n_ios_preload * 100.0 : 0.0;
         auto io_ratio = (double)mean_ious / (double)mean_latency * 100.0;
 // PLACEHOLDER_CACHE_FUNCTION_PART6
         auto mean_n_graph_hits = diskann::get_mean_stats<uint32_t>(

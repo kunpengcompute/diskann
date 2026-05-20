@@ -689,7 +689,7 @@ void PQFlashIndexMGV2<T, LabelT>::cached_beam_search_v2(const T *query1, const u
 
     std::queue<uint32_t> free_io_reqs;
     const uint32_t max_io_reqs =
-        std::min(diskann::defaults::MAX_N_SECTOR_READS / num_sectors_per_node, 128UL); // at most 128 io reqs in flight
+        std::min(diskann::defaults::MAX_N_SECTOR_READS / num_sectors_per_node, diskann::defaults::MAX_IO_REQS_PER_QUERY);
     for (uint32_t i = 0; i < max_io_reqs; i++)
     {
         free_io_reqs.push(i);
@@ -1091,7 +1091,7 @@ uint64_t PQFlashIndexMGV2<T, LabelT>::cache_graph_by_priority(const uint64_t cac
     const uint64_t size_per_io = num_sectors_per_node * defaults::SECTOR_LEN;
 
     std::queue<uint32_t> free_io_reqs;
-    const uint32_t max_io_reqs = std::min(diskann::defaults::MAX_N_SECTOR_READS / num_sectors_per_node, 128UL);
+    const uint32_t max_io_reqs = std::min(diskann::defaults::MAX_N_SECTOR_READS / num_sectors_per_node, diskann::defaults::MAX_IO_REQS_PER_QUERY);
     for (uint32_t i = 0; i < max_io_reqs; i++)
     {
         free_io_reqs.push(i);
@@ -1242,7 +1242,7 @@ uint64_t PQFlashIndexMGV2<T, LabelT>::cache_vectors_by_priority(const uint64_t c
     const uint64_t size_per_io = num_sectors_per_vector * defaults::SECTOR_LEN;
 
     std::queue<uint32_t> free_io_reqs;
-    const uint32_t max_io_reqs = std::min(diskann::defaults::MAX_N_SECTOR_READS / num_sectors_per_vector, 128UL);
+    const uint32_t max_io_reqs = std::min(diskann::defaults::MAX_N_SECTOR_READS / num_sectors_per_vector, diskann::defaults::MAX_IO_REQS_PER_QUERY);
     for (uint32_t i = 0; i < max_io_reqs; i++)
     {
         free_io_reqs.push(i);
@@ -1453,7 +1453,7 @@ void PQFlashIndexMGV2<T, LabelT>::cached_beam_search(const T *query1, const uint
 
     std::queue<uint32_t> free_io_reqs;
     const uint32_t max_io_reqs =
-        std::min(diskann::defaults::MAX_N_SECTOR_READS / num_sectors_per_node, 128UL);
+        std::min(diskann::defaults::MAX_N_SECTOR_READS / num_sectors_per_node, diskann::defaults::MAX_IO_REQS_PER_QUERY);
     for (uint32_t i = 0; i < max_io_reqs; i++)
     {
         free_io_reqs.push(i);

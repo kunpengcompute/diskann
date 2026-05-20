@@ -78,6 +78,7 @@ const uint64_t MAX_N_SECTOR_READS = 512; // max 512 async 4k-io reads
 #else
 const uint64_t MAX_N_SECTOR_READS = 128;
 #endif
+const uint64_t MAX_IO_REQS_PER_QUERY = 128; // must be <= io_uring ring depth (MAX_EVENTS)
 
 // following constants should always be specified, but are useful as a
 // sensible default at cli / python boundaries
