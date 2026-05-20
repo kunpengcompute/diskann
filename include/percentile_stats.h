@@ -38,6 +38,10 @@ struct QueryStats
     unsigned n_ios_preload_hits = 0;
     unsigned pruned_ios = 0;             // # of IOs pruned by ML model
     unsigned n_overflow_queries = 0;     // # of queries that overflowed the IO limit
+    unsigned n_graph_hits = 0;           // # of graph cache hits
+    unsigned n_graph_reads = 0;          // # of graph cache reads
+    unsigned n_vector_hits = 0;          // # of vector cache hits
+    unsigned n_vector_reads = 0;         // # of vector cache reads
 
 
     float preprocess_us = 0;             // total time before entering greedy search

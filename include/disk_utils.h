@@ -1,4 +1,4 @@
-﻿// Copyright (c) Microsoft Corporation. All rights reserved.
+// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 
 #pragma once
@@ -109,6 +109,7 @@ DISKANN_DLLEXPORT uint32_t optimize_beamwidth(std::unique_ptr<diskann::PQFlashIn
                                               uint32_t start_bw = 2);
 #ifdef FAST_DISKANN
 DISKANN_DLLEXPORT int compress_vamana_graph(const char* mem_index_file);
+DISKANN_DLLEXPORT int generate_priority_indegree(const std::string &graph_file, const std::string &output_file);
 #endif
 
 template <typename T, typename LabelT = uint32_t>

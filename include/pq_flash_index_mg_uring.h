@@ -17,6 +17,9 @@
 #include "tsl/robin_map.h"
 #include "tsl/robin_set.h"
 #include "compressed_graph.h"
+#ifdef FAST_DISKANN
+#include "data_cache.h"
+#endif
 #include <optional>
 
 // Inherit from base class
@@ -79,6 +82,17 @@ public:
                                             std::vector<float> &distances, const uint64_t min_beam_width,
                                             QueryStats *stats = nullptr);
 
+#ifdef FAST_DISKANN
+    DISKANN_DLLEXPORT uint64_t cache_graph_by_priority(const uint64_t cache_budget_bytes, const std::string graph_priority_file);
+    DISKANN_DLLEXPORT uint64_t cache_vectors_by_priority(const uint64_t cache_budget_bytes, const std::string vector_priority_file);
+
+    DISKANN_DLLEXPORT template <bool UseCompressedGraph = false, bool ReorderCompressed = false>
+    void cached_beam_search(const T *query, const uint64_t k_search, const uint64_t l_search, uint64_t *res_ids,
+                            float *res_dists, const uint64_t beam_width, const bool use_filter,
+                            const LabelT &filter_label, const uint32_t io_limit, const bool use_reorder_data = false,
+                            QueryStats *stats = nullptr);
+#endif
+
     // Hide base class reader, replace with V2 version
     std::shared_ptr<AlignedFileReaderV2> reader_v2;
 
@@ -99,7 +113,15 @@ private:
 
     alignas(128) std::optional<CompressedGraph> _compressed_graph;
 
+#ifdef FAST_DISKANN
+    float _reorder_ratio = 0.0f;
+#else
     float _reorder_ratio = 2.0f;
+#endif
+
+#ifdef FAST_DISKANN
+    DataCache<T> _data_cache;
+#endif
 
     ConcurrentQueue<SSDThreadDataV2<T> *> _thread_data_v2;
 
