@@ -36,6 +36,11 @@ int main(int argc, char *argv[])
     in.read((char *)&k, sizeof(unsigned));
     if (in.eof())
       break;
+    if (k > _width32)
+    {
+      std::cerr << "Error: invalid degree k=" << k << " exceeds width=" << _width32 << std::endl;
+      return -1;
+    }
     cc += k;
     std::vector<unsigned> tmp(k);
     in.read((char *)tmp.data(), k * sizeof(unsigned));

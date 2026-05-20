@@ -13,6 +13,9 @@ add_executable(print_disk_vamana_header print_disk_vamana_header.cpp)
 add_executable(print_mem_vamana_header print_mem_vamana_header.cpp)
 add_executable(create_data_disk_layout create_data_disk_layout.cpp)
 target_link_libraries(create_data_disk_layout ${PROJECT_NAME})
+add_executable(calculate_in_degree calculate_in_degree.cpp)
+target_link_libraries(calculate_in_degree ${PROJECT_NAME})
+add_executable(calculate_hops_from_entry calculate_hops_from_entry.cpp)
 endif()
 
 add_executable(fvecs_to_bin fvecs_to_bin.cpp)
@@ -125,4 +128,10 @@ if (NOT MSVC)
             stats_label_data
             RUNTIME
     )
+    if(FAST_DISKANN)
+        install(TARGETS calculate_in_degree
+                calculate_hops_from_entry
+                RUNTIME
+        )
+    endif()
 endif()
