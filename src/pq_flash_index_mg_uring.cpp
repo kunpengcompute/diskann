@@ -57,20 +57,23 @@ template <typename T, typename LabelT> PQFlashIndexMGV2<T, LabelT>::~PQFlashInde
     if (this->data != nullptr)
     {
         delete[] this->data;
+        this->data = nullptr;
     }
 #endif
 
     if (this->_centroid_data != nullptr)
+    {
         aligned_free(this->_centroid_data);
-    // delete backing bufs for nhood and coord cache
+        this->_centroid_data = nullptr;
+    }
     if (this->_nhood_cache_buf != nullptr)
     {
         delete[] this->_nhood_cache_buf;
+        this->_nhood_cache_buf = nullptr;
         diskann::aligned_free(this->_coord_cache_buf);
+        this->_coord_cache_buf = nullptr;
     }
 
-    // MGV2 uses _thread_data_v2 and reader_v2 for cleanup
-    // After cleanup, set _load_flag = false to avoid duplicate cleanup in base class destructor
     if (this->_load_flag)
     {
         diskann::cout << "PQFlashIndexMGV2: Clearing scratch" << std::endl;
@@ -78,19 +81,22 @@ template <typename T, typename LabelT> PQFlashIndexMGV2<T, LabelT>::~PQFlashInde
         manager.destroy();
         this->reader_v2->deregister_all_threads();
         reader_v2->close();
-        this->_load_flag = false;  // Avoid duplicate cleanup in base class destructor
+        this->_load_flag = false;
     }
     if (this->_pts_to_label_offsets != nullptr)
     {
         delete[] this->_pts_to_label_offsets;
+        this->_pts_to_label_offsets = nullptr;
     }
     if (this->_pts_to_label_counts != nullptr)
     {
         delete[] this->_pts_to_label_counts;
+        this->_pts_to_label_counts = nullptr;
     }
     if (this->_pts_to_labels != nullptr)
     {
         delete[] this->_pts_to_labels;
+        this->_pts_to_labels = nullptr;
     }
 }
 

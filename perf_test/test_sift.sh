@@ -1,13 +1,15 @@
 #!/bin/bash
 if [ $# -lt 2 ]; then
-    echo "Usage: $0 <data_dir> [build|search|search_cache|all]"
+    echo "Usage: $0 <data_dir> [build|search|all] [cache_budget_gb]"
     echo "  data_dir: directory containing sift_learn.fbin and sift_query.fbin"
     echo "Example: $0 /mnt/data/sift all"
+    echo "         $0 /mnt/data/sift search 0.5"
     exit 1
 fi
 
 DATA_DIR=$1
 MODE=$2
+CACHE_BUDGET=$3
 CURRENT_DIR=$(pwd)
 INDEX_DIR=${DATA_DIR}/index
 BUILD_APP=$CURRENT_DIR/../build/apps/build_disk_index
@@ -45,30 +47,27 @@ build() {
 search() {
     echo "Searching..."
     mkdir -p ${INDEX_DIR}/result/
-    $SEARCH_APP --data_type float --dist_fn l2 \
+
+    cmd="$SEARCH_APP --data_type float --dist_fn l2 \
         --index_path_prefix $INDEX_PREFIX \
         --query_file $QUERY_FILE \
         --gt_file $GT_FILE \
         -K 10 -L 10 20 30 40 50 100 \
         --result_path ${INDEX_DIR}/result/ \
         -T 16 -W 4 \
-        --memory_graph_path ${INDEX_PREFIX}_mem.index.vamana.comp \
-        --reorder_ratio 0.90
-}
+        --reorder_ratio 0.90"
 
-search_cache() {
-    echo "Searching with cache..."
-    mkdir -p ${INDEX_DIR}/result_cache/
-    $SEARCH_APP --data_type float --dist_fn l2 \
-        --index_path_prefix $INDEX_PREFIX \
-        --query_file $QUERY_FILE \
-        --gt_file $GT_FILE \
-        -K 10 -L 10 20 30 40 50 100 \
-        --result_path ${INDEX_DIR}/result_cache/ \
-        -T 16 -W 4 \
-        --reorder_ratio 0.90 \
-        --cache_budget 0.5 \
-        --repeat 3
+    if [ -n "$CACHE_BUDGET" ]; then
+        cmd="$cmd \
+        --cache_budget $CACHE_BUDGET \
+        --repeat 3"
+    else
+        cmd="$cmd \
+        --memory_graph_path ${INDEX_PREFIX}_mem.index.vamana.comp"
+    fi
+
+    echo "Executing: $cmd"
+    eval "$cmd"
 }
 
 case "$MODE" in
@@ -79,14 +78,10 @@ case "$MODE" in
     "search")
         search
         ;;
-    "search_cache")
-        search_cache
-        ;;
     "all")
         compute_gt
         build
         search
-        search_cache
         ;;
     *)
         echo "Unknown mode: $MODE"

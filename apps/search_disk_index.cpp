@@ -201,7 +201,18 @@ int search_disk_index(diskann::Metric &metric, const std::string &index_path_pre
 
     int res = 0;
     if (use_Fast)
+    {
+        std::string mem_index_file = index_path_prefix + "_mem.index";
+        if (!memory_graph_path.empty() && !file_exists(memory_graph_path))
+        {
+            if (file_exists(mem_index_file))
+            {
+                diskann::cout << "Compressed graph not found, generating: " << memory_graph_path << std::endl;
+                diskann::compress_vamana_graph(mem_index_file.c_str());
+            }
+        }
         res = _pFlashIndex2->load(num_threads, index_path_prefix.c_str(), memory_graph_path.c_str(), true, reorder_ratio);
+    }
     else
         res = _pFlashIndex->load(num_threads, index_path_prefix.c_str());
 
@@ -1059,7 +1070,7 @@ int main(int argc, char **argv)
 #ifdef FAST_DISKANN
     float reorder_ratio = 0.0f;
     std::string memory_graph_path;
-    double cache_budget_gb = 0.0;
+    double cache_budget_gb = -1.0;
     std::string graph_priority_file = "null";
     uint32_t repeat_count = 7;
 #endif
@@ -1099,8 +1110,8 @@ int main(int argc, char **argv)
                                        program_options_utils::REORDER_RATIO);
         optional_configs.add_options()("memory_graph_path", po::value<std::string>(&memory_graph_path)->default_value(""),
                                        program_options_utils::MEM_GRAPH_PATH_DESCRIPTION);
-        optional_configs.add_options()("cache_budget", po::value<double>(&cache_budget_gb)->default_value(0.0),
-                                       "Cache budget(GB) for graph and vectors. Default value: 0.0");
+        optional_configs.add_options()("cache_budget", po::value<double>(&cache_budget_gb)->default_value(-1.0),
+                                       "Cache budget(GB) for graph and vectors. -1 means disabled, 0 means no cache but use cache path.");
         optional_configs.add_options()("graph_priority_file",
                                        po::value<std::string>(&graph_priority_file)->default_value(std::string("null")),
                                        "Graph priority file for cache. Default value: null");
@@ -1210,7 +1221,7 @@ int main(int argc, char **argv)
     try
     {
 #ifdef FAST_DISKANN
-        if (cache_budget_gb > 0)
+        if (cache_budget_gb >= 0)
         {
             if (data_type == std::string("float"))
                 return search_disk_index_cache<float>(
