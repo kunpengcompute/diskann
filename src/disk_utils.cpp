@@ -1227,8 +1227,12 @@ DISKANN_DLLEXPORT int compress_vamana_graph(const char* mem_index_file_cstr) {
     std::string mem_index_file(mem_index_file_cstr);
     std::string compressed_graph_file_path = mem_index_file + ".vamana.comp";
     std::ifstream vamana_reader(mem_index_file, std::ios::binary);
+    if (!vamana_reader.is_open())
+    {
+        diskann::cerr << "compress_vamana_graph: failed to open " << mem_index_file << std::endl;
+        return -1;
+    }
 
-    // metadata: width, medoid
     uint32_t width_u32, medoid_u32;
     size_t file_size;
 
@@ -1247,6 +1251,12 @@ DISKANN_DLLEXPORT int compress_vamana_graph(const char* mem_index_file_cstr) {
         vamana_reader.read((char *)&k, sizeof(unsigned));
         if (vamana_reader.eof())
             break;
+        if (k > width_u32)
+        {
+            diskann::cerr << "compress_vamana_graph: invalid degree k=" << k
+                          << " exceeds width=" << width_u32 << std::endl;
+            return -1;
+        }
         cc += k;
         std::vector<unsigned> tmp(k);
         vamana_reader.read((char *)tmp.data(), k * sizeof(unsigned));
@@ -1257,6 +1267,123 @@ DISKANN_DLLEXPORT int compress_vamana_graph(const char* mem_index_file_cstr) {
             << " nodes: " << graph.size() << " average degree in graph: " << cc << std::endl;
     CompressedGraph CG = CompressedGraph(graph, width_u32, medoid_u32);
     CG.saveToFile(compressed_graph_file_path);
+    return 0;
+}
+
+DISKANN_DLLEXPORT int generate_priority_indegree(const std::string &graph_file, const std::string &output_file)
+{
+    std::ifstream graph_reader(graph_file, std::ios::binary);
+    if (!graph_reader)
+    {
+        diskann::cerr << "generate_priority_indegree: failed to open graph file: " << graph_file << std::endl;
+        return -1;
+    }
+
+    constexpr std::streamsize header_size = 24;
+    char header_buffer[24];
+    graph_reader.read(header_buffer, header_size);
+    if (!graph_reader)
+    {
+        diskann::cerr << "generate_priority_indegree: failed to read header" << std::endl;
+        return -1;
+    }
+
+    uint64_t file_size_hdr;
+    uint32_t width, entry_point;
+    uint64_t frozen;
+    std::memcpy(&file_size_hdr, header_buffer, 8);
+    std::memcpy(&width, header_buffer + 8, 4);
+    std::memcpy(&entry_point, header_buffer + 12, 4);
+    std::memcpy(&frozen, header_buffer + 16, 8);
+
+    graph_reader.seekg(header_size, std::ios::beg);
+
+    std::vector<uint32_t> in_degrees;
+    std::vector<uint32_t> neighbors_num;
+
+    while (true)
+    {
+        uint32_t k;
+        graph_reader.read(reinterpret_cast<char *>(&k), sizeof(uint32_t));
+        if (graph_reader.eof())
+            break;
+        if (!graph_reader)
+        {
+            diskann::cerr << "generate_priority_indegree: failed reading node degree" << std::endl;
+            return -1;
+        }
+        neighbors_num.push_back(k);
+        for (uint32_t i = 0; i < k; ++i)
+        {
+            uint32_t neighbor;
+            graph_reader.read(reinterpret_cast<char *>(&neighbor), sizeof(uint32_t));
+            if (!graph_reader)
+            {
+                diskann::cerr << "generate_priority_indegree: failed reading neighbor" << std::endl;
+                return -1;
+            }
+            if (neighbor >= in_degrees.size())
+                in_degrees.resize(neighbor + 1, 0);
+            in_degrees[neighbor]++;
+        }
+    }
+
+    const size_t num_nodes = in_degrees.size();
+    if (num_nodes == 0)
+    {
+        diskann::cerr << "generate_priority_indegree: graph is empty" << std::endl;
+        return -1;
+    }
+
+    uint32_t max_in_degree = 0;
+    for (const uint32_t deg : in_degrees)
+    {
+        if (deg > max_in_degree)
+            max_in_degree = deg;
+    }
+
+    std::vector<std::pair<uint32_t, uint32_t>> degree_node_pairs(num_nodes);
+    for (size_t i = 0; i < num_nodes; ++i)
+        degree_node_pairs[i] = {in_degrees[i], static_cast<uint32_t>(i)};
+
+    std::sort(degree_node_pairs.begin(), degree_node_pairs.end(),
+              [](const auto &a, const auto &b) { return a.first > b.first; });
+
+    std::ofstream bin_output(output_file, std::ios::binary);
+    if (!bin_output)
+    {
+        diskann::cerr << "generate_priority_indegree: failed to open output: " << output_file << std::endl;
+        return -1;
+    }
+
+    const uint64_t file_size_bin = 24 + num_nodes * 12;
+    const uint64_t num_nodes_bin = static_cast<uint64_t>(num_nodes);
+    const uint32_t reserved = 0;
+    bin_output.write(reinterpret_cast<const char *>(&file_size_bin), 8);
+    bin_output.write(reinterpret_cast<const char *>(&num_nodes_bin), 8);
+    bin_output.write(reinterpret_cast<const char *>(&max_in_degree), 4);
+    bin_output.write(reinterpret_cast<const char *>(&reserved), 4);
+
+    for (const auto &p : degree_node_pairs)
+    {
+        const uint32_t node_id = p.second;
+        const uint16_t n_num = (node_id < neighbors_num.size()) ? static_cast<uint16_t>(neighbors_num[node_id]) : 0;
+        const uint16_t storage_bytes = static_cast<uint16_t>(n_num * 4);
+        const uint32_t in_degree_val = p.first;
+        bin_output.write(reinterpret_cast<const char *>(&node_id), 4);
+        bin_output.write(reinterpret_cast<const char *>(&n_num), 2);
+        bin_output.write(reinterpret_cast<const char *>(&storage_bytes), 2);
+        bin_output.write(reinterpret_cast<const char *>(&in_degree_val), 4);
+    }
+
+    if (!bin_output)
+    {
+        diskann::cerr << "generate_priority_indegree: write failed" << std::endl;
+        return -1;
+    }
+
+    diskann::cout << "Generated priority file: " << output_file
+                  << " (" << num_nodes << " nodes, max_in_degree=" << max_in_degree << ")" << std::endl;
     return 0;
 }
 #endif
@@ -1581,7 +1708,12 @@ int build_disk_index(const char *dataFilePath, const char *indexFilePath, const 
     }
     if (created_temp_file_for_processed_data)
         std::remove(prepped_base.c_str());
+#ifdef FAST_DISKANN
+    if (!generate_mem_file)
+        std::remove(mem_index_path.c_str());
+#else
     std::remove(mem_index_path.c_str());
+#endif
     if (use_disk_pq)
         std::remove(disk_pq_compressed_vectors_path.c_str());
 
