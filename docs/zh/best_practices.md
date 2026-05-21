@@ -6,22 +6,22 @@
 
 **获取数据集与测试程序**
 
-1. 测试程序目录为“/path/to/DiskANN/perf_test“，目录结构应如下所示：
+1. 测试程序目录为“/path/to/DiskANN/perf_test”，目录结构应如下所示：
 
-```text
-diskann/
-└── perf_test/                                                    // 性能测试脚本目录
-      ├── test.sh                                                 // 主测试入口，设置带宽限制并依次运行两个数据集的搜索测试
-      ├── test_100m.sh                                            // 100M×1536维数据集的构建与搜索测试脚本
-      ├── test_bge.sh                                             // BGE 10M×1024维数据集的构建与搜索测试脚本
-      ├── test_sift.sh                                            // SIFT数据集的构建与搜索测试脚本，支持cache_budget参数
-      ├── ssd-conc.sh                                             // SSD IOPS并发压测脚本，使用fio测量随机读性能
-      ├── set_fio_limit_v2.sh                                     // 创建fio_limit cgroup并设置IOPS限速
-      ├── mv_shell_to_fio_limit_v2.sh                             // 将当前shell移入fio_limit cgroup，启用带宽限速
-      └── mv_shell_back.sh                                        // 将当前shell移回默认blkio cgroup，取消带宽限速
-```
+   ```text
+   diskann/
+   └── perf_test/                          // 性能测试脚本目录
+         ├── test.sh                       // 主测试入口，设置带宽限制并依次运行两个数据集的搜索测试
+         ├── test_100m.sh                  // 100M×1536维数据集的构建与搜索测试脚本
+         ├── test_bge.sh                   // BGE 10M×1024维数据集的构建与搜索测试脚本
+         ├── test_sift.sh                  // SIFT数据集的构建与搜索测试脚本，支持cache_budget参数
+         ├── ssd-conc.sh                   // SSD IOPS并发压测脚本，使用fio测量随机读性能
+         ├── set_fio_limit_v2.sh           // 创建fio_limit cgroup并设置IOPS限速
+         ├── mv_shell_to_fio_limit_v2.sh   // 将当前shell移入fio_limit cgroup，启用带宽限速
+         └── mv_shell_back.sh              // 将当前shell移回默认blkio cgroup，取消带宽限速
+   ```
 
-2. 获取数据集。假设数据存放路径为“/path/to/data“。
+2. 获取数据集。假设数据存放路径为“/path/to/data”。
 
     ```bash
     cd /path/to/data
@@ -38,6 +38,7 @@ diskann/
     ```
 
 2. 请参考《[安装指南](./installation_guide.md)》编译DiskANN。
+
    >**说明：** 作为全量优化后DiskANN测试，需开启与鲲鹏优化相关的宏 **-DFAST\_DISKANN=ON**。
 
 3. 处理数据集。
@@ -55,7 +56,7 @@ diskann/
     bash test_bge.sh /path/to/data/sift build
     ```
 
-4. 加载构建好的索引进行查询。
+5. 加载构建好的索引进行查询。
 
     ```bash
     bash test_bge.sh /path/to/data/sift search
@@ -71,22 +72,22 @@ diskann/
 
 **获取数据集与测试程序**
 
-1. 测试程序目录为“/path/to/DiskANN/perf_test“，目录结构应如下所示：
+1. 测试程序目录为“/path/to/DiskANN/perf_test”，目录结构应如下所示：
 
-```text
-diskann/
-└── perf_test/                                                    // 性能测试脚本目录
-      ├── test.sh                                                 // 主测试入口，设置带宽限制并依次运行两个数据集的搜索测试
-      ├── test_100m.sh                                            // 100M×1536维数据集的构建与搜索测试脚本
-      ├── test_bge.sh                                             // BGE 10M×1024维数据集的构建与搜索测试脚本
-      ├── test_sift.sh                                            // SIFT数据集的构建与搜索测试脚本，支持cache_budget参数
-      ├── ssd-conc.sh                                             // SSD IOPS并发压测脚本，使用fio测量随机读性能
-      ├── set_fio_limit_v2.sh                                     // 创建fio_limit cgroup并设置IOPS限速
-      ├── mv_shell_to_fio_limit_v2.sh                             // 将当前shell移入fio_limit cgroup，启用带宽限速
-      └── mv_shell_back.sh                                        // 将当前shell移回默认blkio cgroup，取消带宽限速
-```
+   ```text
+   diskann/
+   └── perf_test/                                                    // 性能测试脚本目录
+         ├── test.sh                                                 // 主测试入口，设置带宽限制并依次运行两个数据集的搜索测试
+         ├── test_100m.sh                                            // 100M×1536维数据集的构建与搜索测试脚本
+         ├── test_bge.sh                                             // BGE 10M×1024维数据集的构建与搜索测试脚本
+         ├── test_sift.sh                                            // SIFT数据集的构建与搜索测试脚本，支持cache_budget参数
+         ├── ssd-conc.sh                                             // SSD IOPS并发压测脚本，使用fio测量随机读性能
+         ├── set_fio_limit_v2.sh                                     // 创建fio_limit cgroup并设置IOPS限速
+         ├── mv_shell_to_fio_limit_v2.sh                             // 将当前shell移入fio_limit cgroup，启用带宽限速
+         └── mv_shell_back.sh                                        // 将当前shell移回默认blkio cgroup，取消带宽限速
+   ```
 
-2. 获取数据集。假设数据存放路径为“/path/to/data“。
+2. 获取数据集。假设数据存放路径为“/path/to/data”。
 
     ```bash
     cd /path/to/data
@@ -94,7 +95,7 @@ diskann/
     tar -xf sift.tar.gz
     ```
 
-**全量优化后DiskANN测试**
+**等价优化后DiskANN测试**
 
 1. 安装相关依赖。
 
@@ -103,6 +104,7 @@ diskann/
     ```
 
 2. 请参考《[安装指南](./installation_guide.md)》编译DiskANN。
+
    >**说明：** 作为等价优化后DiskANN测试，需开启与鲲鹏优化相关的宏 **-DFAST\_DISKANN=ON**。
 
 3. 处理数据集。
@@ -120,7 +122,7 @@ diskann/
     bash test_bge.sh /path/to/data/sift build
     ```
 
-4. 加载构建好的索引进行查询。
+5. 加载构建好的索引进行查询。
 
     ```bash
     bash test_bge.sh /path/to/data/sift search
