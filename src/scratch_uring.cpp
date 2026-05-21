@@ -94,6 +94,9 @@ template <typename T> void SSDQueryScratchV2<T>::reset()
 {
     sector_idx = 0;
     visited.clear();
+#ifdef FAST_DISKANN
+    ids_sent.clear();
+#endif
     retset.clear();
     retset_lb.clear();
     full_retset.clear();

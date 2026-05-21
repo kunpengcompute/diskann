@@ -145,6 +145,9 @@ template <typename T> class SSDQueryScratchV2 : public AbstractScratch<T>
     size_t sector_idx = 0;          // index of next [SECTOR_LEN] scratch to use
 
     tsl::robin_set<size_t> visited;
+#ifdef FAST_DISKANN
+    tsl::robin_set<uint32_t> ids_sent;
+#endif
     NeighborPriorityQueue retset;
     OriginNeighborPriorityQueue retset_lb;
     std::vector<SmallNeighbor> full_retset;

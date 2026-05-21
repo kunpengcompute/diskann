@@ -14,10 +14,6 @@ BOOST_AUTO_TEST_SUITE(PQFlashIndexIntegrationTests)
 // Helper to generate test index once
 struct TestIndexGenerator {
     static bool generate_if_needed() {
-        if (std::ifstream("/tmp/test_index_disk.index").good()) {
-            return true; // Already exists
-        }
-
         const char* prefix = "/tmp/test_index";
         const uint32_t num_points = 20;
         const uint32_t dim = 4;
@@ -50,7 +46,9 @@ struct TestIndexGenerator {
         out.write((char*)&nc, sizeof(uint32_t));
 
         uint64_t disk_nnodes = num_points, disk_ndims = dim, medoid_id = 0;
-        uint64_t max_node_len = 4096, nnodes_per_sector = 1;
+        uint32_t max_degree = 64;
+        uint64_t max_node_len = dim * sizeof(float) + (max_degree + 1) * sizeof(uint32_t);
+        uint64_t nnodes_per_sector = 4096 / max_node_len;
         out.write((char*)&disk_nnodes, sizeof(uint64_t));
         out.write((char*)&disk_ndims, sizeof(uint64_t));
         out.write((char*)&medoid_id, sizeof(uint64_t));

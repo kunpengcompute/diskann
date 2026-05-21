@@ -79,14 +79,6 @@ lcov --remove coverage_patch_files.info \
   --output-file coverage_patch_files.info \
   --rc lcov_branch_coverage=1
 
-# Filter to only include FAST_DISKANN blocks
-echo "Filtering coverage to only FAST_DISKANN blocks..."
-python3 ../filter_fast_diskann_coverage.py coverage_patch_files.info coverage_fast_diskann_only.info .
-
-# Generate HTML report for FAST_DISKANN code only
-echo "Generating HTML report for FAST_DISKANN code only..."
-genhtml coverage_fast_diskann_only.info --output-directory coverage_report_fast_diskann --rc lcov_branch_coverage=1
-
 # Now extract ONLY the lines modified by the patch
 echo ""
 echo "=== Analyzing patch-modified lines only ==="

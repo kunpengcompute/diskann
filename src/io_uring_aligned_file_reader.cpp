@@ -19,6 +19,8 @@ constexpr uint64_t kNoUserData = 0;
 void execute_io(void *context, int fd, std::vector<IORequest> &reqs, uint64_t n_retries = 0, bool write = false)
 {
     io_uring *ring = (io_uring *)context;
+    constexpr uint64_t max_retries = 5;
+    uint64_t attempts = 0;
     while (true)
     {
         for (uint64_t j = 0; j < reqs.size(); j++)
@@ -62,7 +64,12 @@ void execute_io(void *context, int fd, std::vector<IORequest> &reqs, uint64_t n_
             io_uring_cqe_seen(ring, cqe);
         }
         if (!fail)
-        { // repeat until no fails.
+        {
+            break;
+        }
+        if (++attempts > max_retries)
+        {
+            LOG(ERROR) << "execute_io: exceeded max retries (" << max_retries << "), aborting";
             break;
         }
     }
@@ -115,7 +122,13 @@ void LinuxAlignedFileReaderV2::register_thread(int flag)
     if (ioctx::ring == nullptr)
     {
         ioctx::ring = new io_uring();
-        io_uring_queue_init(MAX_EVENTS, ioctx::ring, flag);
+        int ret = io_uring_queue_init(MAX_EVENTS, ioctx::ring, flag);
+        if (ret < 0)
+        {
+            LOG(ERROR) << "io_uring_queue_init failed: " << strerror(-ret);
+            delete ioctx::ring;
+            ioctx::ring = nullptr;
+        }
     }
 }
 

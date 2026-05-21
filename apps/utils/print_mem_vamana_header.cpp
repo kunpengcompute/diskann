@@ -20,11 +20,13 @@ void load_nsg(const char *filename, std::vector<std::vector<uint32_t>> &graph)
     {
         unsigned k = 0;
         in.read((char *)&k, sizeof(unsigned));
-        if (in.eof())
+        if (in.eof() || !in)
             break;
         cc += k;
         std::vector<unsigned> tmp(k);
         in.read((char *)tmp.data(), k * sizeof(unsigned));
+        if (!in)
+            break;
         graph.push_back(tmp);
     }
 }
@@ -69,6 +71,11 @@ int main(int argc, char **argv)
     std::vector<char> buffer(buffer_size);
 
     readr.read(buffer.data(), buffer_size);
+    if (!readr)
+    {
+        std::cerr << "Failed to read header from: " << argv[1] << std::endl;
+        return 1;
+    }
 
     uint32_t *header_ptr = reinterpret_cast<uint32_t *>(buffer.data());
     size_t *header_ptr_size = reinterpret_cast<size_t *>(buffer.data());
