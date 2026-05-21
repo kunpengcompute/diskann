@@ -1,6 +1,6 @@
 - [项目介绍](../../README.md)
 - [特性介绍](./feature_introduction.md)
 - [版本说明书](./release_notes.md)
-- [安装指南](./installation.md)
+- [安装指南](./installation_guide.md)
 - [最佳实践](./best_practices.md)
 - [API参考](./api_reference.md)

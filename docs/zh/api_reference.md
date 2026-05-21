@@ -110,6 +110,7 @@ int search_disk_index(
 | 返回值 | 说明 |
 |---|---|
 | `0` | 正常返回 |
+<<<<<<< HEAD
 | `-1` | 失败（含recall低于`fail_if_recall_below 的情况） |
 
 ## search_disk_index_cache

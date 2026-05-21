@@ -27,7 +27,7 @@
     git clone --branch v1.0.0 https://gitcode.com/boostkit/diskann.git diskann-patch
     ```
 
-    >![](public_sys-resources/icon-note.gif) **说明：** 
+    >**说明：** 
     >鲲鹏优化补丁文件描述如下，请根据需要自行选择：
     >- 0001-diskann\_1.8.0-optimize-neq.patch：全量优化补丁，性能最优，保证精度，但不保证Top-K的值或顺序与原生完全一致。
     >- 0002-diskann\_1.8.0-optimize-eqv.patch：等价优化补丁，保证Top-K的值与顺序与原生保持完全一致。
@@ -78,7 +78,7 @@
     make install
     ```
 
-    >![](public_sys-resources/icon-note.gif) **说明：** 
+    >**说明：** 
     >您可通过**make install PREFIX=/path/to/openblas/install**设置“/path/to/openblas/install”以指定安装路径，默认安装路径为“/opt/OpenBLAS”。
 
 6. 安装全量补丁文件0001-diskann\_0.7.0-optimize-neq.patch或等价优化补丁0002-diskann\_0.7.0-optimize-eqv.patch。
