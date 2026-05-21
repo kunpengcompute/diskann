@@ -1,0 +1,73 @@
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT license.
+
+set(CMAKE_COMPILE_WARNING_AS_ERROR ON)
+
+find_package(Boost COMPONENTS unit_test_framework)
+
+# For Windows, fall back to nuget version if find_package didn't find it.
+if (MSVC AND NOT Boost_FOUND)
+    set(DISKANN_BOOST_INCLUDE "${DISKANN_MSVC_PACKAGES}/boost/lib/native/include")
+    # Multi-threaded static library.
+    set(UNIT_TEST_FRAMEWORK_LIB_PATTERN "${DISKANN_MSVC_PACKAGES}/boost_unit_test_framework-vc${MSVC_TOOLSET_VERSION}/lib/native/libboost_unit_test_framework-vc${MSVC_TOOLSET_VERSION}-mt-x64-*.lib")
+    file(GLOB DISKANN_BOOST_UNIT_TEST_FRAMEWORK_LIB ${UNIT_TEST_FRAMEWORK_LIB_PATTERN})
+
+    set(UNIT_TEST_FRAMEWORK_DLIB_PATTERN "${DISKANN_MSVC_PACKAGES}/boost_unit_test_framework-vc${MSVC_TOOLSET_VERSION}/lib/native/libboost_unit_test_framework-vc${MSVC_TOOLSET_VERSION}-mt-gd-x64-*.lib")
+    file(GLOB DISKANN_BOOST_UNIT_TEST_FRAMEWORK_DLIB ${UNIT_TEST_FRAMEWORK_DLIB_PATTERN})
+
+    if (EXISTS ${DISKANN_BOOST_INCLUDE} AND EXISTS ${DISKANN_BOOST_UNIT_TEST_FRAMEWORK_LIB} AND EXISTS ${DISKANN_BOOST_UNIT_TEST_FRAMEWORK_DLIB})
+        set(Boost_FOUND ON)
+        set(Boost_INCLUDE_DIR ${DISKANN_BOOST_INCLUDE})
+        add_library(Boost::unit_test_framework STATIC IMPORTED)
+        set_target_properties(Boost::unit_test_framework PROPERTIES IMPORTED_LOCATION_RELEASE "${DISKANN_BOOST_UNIT_TEST_FRAMEWORK_LIB}")
+        set_target_properties(Boost::unit_test_framework PROPERTIES IMPORTED_LOCATION_DEBUG "${DISKANN_BOOST_UNIT_TEST_FRAMEWORK_DLIB}")
+        message(STATUS "Falling back to using Boost from the nuget package")
+    else()
+        message(WARNING "Couldn't find Boost. Was looking for ${DISKANN_BOOST_INCLUDE} and ${UNIT_TEST_FRAMEWORK_LIB_PATTERN}")
+    endif()
+endif()
+
+if (NOT Boost_FOUND)
+    message(FATAL_ERROR "Couldn't find Boost dependency")
+endif()
+
+
+if(FAST_DISKANN)
+set(DISKANN_UNIT_TEST_SOURCES
+    main.cpp
+    index_write_parameters_builder_tests.cpp
+    io_uring_reader_tests.cpp
+    linux_reader_tests.cpp
+    disk_utils_tests.cpp
+    pq_tests.cpp
+    utils_tests.cpp
+    scratch_uring_tests.cpp
+    math_utils_tests.cpp
+    ann_exception_tests.cpp
+    distance_tests.cpp
+    additional_coverage_tests.cpp
+    pq_neon_tests.cpp
+    pq_flash_index_integration_tests.cpp
+    simple_pq_coverage_tests.cpp
+    pq_flash_index_coverage_tests.cpp
+    pq_flash_index_mg_coverage_tests.cpp
+)
+else()
+set(DISKANN_UNIT_TEST_SOURCES main.cpp index_write_parameters_builder_tests.cpp)
+endif()
+
+add_executable(${PROJECT_NAME}_unit_tests ${DISKANN_SOURCES} ${DISKANN_UNIT_TEST_SOURCES})
+
+if(FAST_DISKANN)
+set(TEST_LINK_LIBS ${PROJECT_NAME} ${DISKANN_TOOLS_TCMALLOC_LINK_OPTIONS} Boost::unit_test_framework)
+# Add aio library on Linux
+if(UNIX AND NOT APPLE)
+    list(APPEND TEST_LINK_LIBS aio)
+endif()
+target_link_libraries(${PROJECT_NAME}_unit_tests ${TEST_LINK_LIBS})
+else()
+target_link_libraries(${PROJECT_NAME}_unit_tests ${PROJECT_NAME} ${DISKANN_TOOLS_TCMALLOC_LINK_OPTIONS} Boost::unit_test_framework)
+endif()
+
+add_test(NAME ${PROJECT_NAME}_unit_tests COMMAND ${PROJECT_NAME}_unit_tests)
+
