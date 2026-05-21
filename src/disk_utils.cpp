@@ -11,7 +11,12 @@
 #include "disk_utils.h"
 #include "cached_io.h"
 #include "index.h"
+#ifdef FAST_DISKANN
+#include <cblas.h>
+#else
 #include "mkl.h"
+#endif
+
 #include "omp.h"
 #include "percentile_stats.h"
 #include "partition.h"
@@ -684,6 +689,11 @@ int build_merged_vamana_index(std::string base_file, diskann::Metric compareMetr
     // where the universal label is to be saved in the final graph
     std::string final_index_universal_label_file = mem_index_path + "_universal_label.txt";
 
+#ifdef FAST_DISKANN
+    uint64_t ram_budget_u64 = ram_budget;
+    // add mem budget to tail for rebuild index
+#endif
+
     std::string merged_index_prefix = mem_index_path + "_tempFiles";
 
     Timer timer;
@@ -695,6 +705,48 @@ int build_merged_vamana_index(std::string base_file, diskann::Metric compareMetr
     std::rename(cur_centroid_filepath.c_str(), centroids_file.c_str());
 
     timer.reset();
+
+#ifdef FAST_DISKANN
+    bool force_rebuild = true;
+    if (num_parts < 0)
+    {
+        force_rebuild = false;
+        num_parts = -num_parts;
+    }
+    std::vector<int> to_build_parts;
+    for (int p = 0; p < num_parts; p++)
+    {
+        std::string shard_index_file = merged_index_prefix + "_subshard-" + std::to_string(p) + "_mem.index";
+        if (!file_exists(shard_index_file) || force_rebuild)
+        {
+            to_build_parts.push_back(p);
+        }
+        else
+        {
+            uint64_t file_size = get_file_size(shard_index_file);
+            std::ifstream in(shard_index_file, std::ios::binary | std::ios::in);
+            uint64_t file_size_in_index;
+            in.read((char *)&file_size_in_index, sizeof(uint64_t));
+
+            if (file_size_in_index == 24 || file_size != file_size_in_index)
+            {
+                to_build_parts.push_back(p);
+                std::cout << "[Partition] Shard " << p << " index has been built, but it's size " << file_size
+                          << " != " << file_size_in_index << ", so file is broken, it needs to rebuild." << std::endl;
+            }
+            else if (file_size == file_size_in_index)
+            {
+                std::cout << "[Partition] Shard " << p << " index has been built, it's size " << file_size
+                          << " == " << file_size_in_index << ", so don't build again." << std::endl;
+            }
+            else
+            {
+                throw std::runtime_error("[Partition] Shard " + std::to_string(p) + " has encountered errors");
+            }
+        }
+    }
+#endif
+
     for (int p = 0; p < num_parts; p++)
     {
 #if defined(DISKANN_RELEASE_UNUSED_TCMALLOC_MEMORY_AT_CHECKPOINTS) && defined(DISKANN_BUILD)
@@ -707,6 +759,69 @@ int build_merged_vamana_index(std::string base_file, diskann::Metric compareMetr
 
         std::string shard_labels_file = merged_index_prefix + "_subshard-" + std::to_string(p) + "_labels.txt";
 
+#ifdef FAST_DISKANN
+        std::string shard_index_file = merged_index_prefix + "_subshard-" + std::to_string(p) + "_mem.index";
+
+        auto it = std::find(to_build_parts.begin(), to_build_parts.end(), p);
+        if (it != to_build_parts.end())
+        {
+            std::cout << "[Partition] Shard " << p << " index has not been built, start build." << std::endl;
+            // parts has not been built
+            retrieve_shard_data_from_ids<T>(base_file, shard_ids_file, shard_base_file);
+
+            diskann::IndexWriteParameters low_degree_params = diskann::IndexWriteParametersBuilder(L, 2 * R / 3)
+                                                                  .with_filter_list_size(Lf)
+                                                                  .with_saturate_graph(false)
+                                                                  .with_num_threads(num_threads)
+                                                                  .build();
+
+            uint64_t shard_base_dim, shard_base_pts;
+            get_bin_metadata(shard_base_file, shard_base_pts, shard_base_dim);
+
+            diskann::Index<T> _index(compareMetric, shard_base_dim, shard_base_pts,
+                                     std::make_shared<diskann::IndexWriteParameters>(low_degree_params), nullptr,
+                                     defaults::NUM_FROZEN_POINTS_STATIC, false, false, false, build_pq_bytes > 0,
+                                     build_pq_bytes, use_opq);
+            if (!use_filters)
+            {
+                _index.build(shard_base_file.c_str(), shard_base_pts);
+            }
+            else
+            {
+                diskann::extract_shard_labels(label_file, shard_ids_file, shard_labels_file);
+                if (universal_label != "")
+                { //  indicates no universal label
+                    LabelT unv_label_as_num = 0;
+                    _index.set_universal_label(unv_label_as_num);
+                }
+                _index.build_filtered_index(shard_base_file.c_str(), shard_labels_file, shard_base_pts);
+            }
+            _index.save(shard_index_file.c_str());
+        }
+        else
+        {
+            std::cout << "[Partition] Shard " << p << " index has been built, don't build again." << std::endl;
+        }
+
+        {
+            double mem_used = diskann::get_max_rss_gb();
+            diskann::cout << "[Memory] Maximum used memory until build shard " << p << " :" << mem_used << " GB"
+                          << std::endl;
+        }
+
+        // copy universal label file from first shard to the final destination
+        // index, since all shards anyway share the universal label
+        if (p == 0)
+        {
+            std::string shard_universal_label_file = shard_index_file + "_universal_label.txt";
+            if (universal_label != "")
+            {
+                copy_file(shard_universal_label_file, final_index_universal_label_file);
+            }
+        }
+
+        std::remove(shard_base_file.c_str());
+#else
         retrieve_shard_data_from_ids<T>(base_file, shard_ids_file, shard_base_file);
 
         std::string shard_index_file = merged_index_prefix + "_subshard-" + std::to_string(p) + "_mem.index";
@@ -751,6 +866,7 @@ int build_merged_vamana_index(std::string base_file, diskann::Metric compareMetr
         }
 
         std::remove(shard_base_file.c_str());
+#endif
     }
     diskann::cout << timer.elapsed_seconds_for_step("building indices on shards") << std::endl;
 
@@ -771,7 +887,11 @@ int build_merged_vamana_index(std::string base_file, diskann::Metric compareMetr
 
         std::remove(shard_base_file.c_str());
         std::remove(shard_id_file.c_str());
+#ifdef FAST_DISKANN
+        // std::remove(shard_index_file.c_str());
+#else
         std::remove(shard_index_file.c_str());
+#endif
         std::remove(shard_index_file_data.c_str());
         if (use_filters)
         {
@@ -909,7 +1029,11 @@ void create_disk_layout(const std::string base_file, const std::string mem_index
 
         throw diskann::ANNException(stream.str(), -1, __FUNCSIG__, __FILE__, __LINE__);
     }
+#ifdef FAST_DISKANN
+    uint64_t vamana_frozen_num = 0, vamana_frozen_loc = 0;
+#else
     uint64_t vamana_frozen_num = false, vamana_frozen_loc = 0;
+#endif
 
     vamana_reader.read((char *)&width_u32, sizeof(uint32_t));
     vamana_reader.read((char *)&medoid_u32, sizeof(uint32_t));
@@ -1097,6 +1221,7 @@ void create_disk_layout(const std::string base_file, const std::string mem_index
     diskann::cout << "Output disk index file written to " << output_file << std::endl;
 }
 
+
 template <typename T, typename LabelT>
 int build_disk_index(const char *dataFilePath, const char *indexFilePath, const char *indexBuildParameters,
                      diskann::Metric compareMetric, bool use_opq, const std::string &codebook_prefix, bool use_filters,
@@ -1254,7 +1379,12 @@ int build_disk_index(const char *dataFilePath, const char *indexFilePath, const 
     if (num_threads != 0)
     {
         omp_set_num_threads(num_threads);
+#ifdef FAST_DISKANN
+        // BlasSetNumThreads(num_threads);
+        openblas_set_num_threads(num_threads);
+#else
         mkl_set_num_threads(num_threads);
+#endif
     }
 
     diskann::cout << "Starting index build: R=" << R << " L=" << L << " Query RAM budget: " << final_index_ram_limit
@@ -1283,6 +1413,15 @@ int build_disk_index(const char *dataFilePath, const char *indexFilePath, const 
             labels_file_to_use = augmented_labels_file;
         }
     }
+#ifdef FAST_DISKANN
+    {
+        auto e = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> diff = e - s;
+        diskann::cout << "[Time] Indexing time until now: " << diff.count() << std::endl;
+        double mem_used = diskann::get_max_rss_gb();
+        diskann::cout << "[Memory] Maximum used memory until now: " << mem_used << " GB" << std::endl;
+    }
+#endif
 
     size_t points_num, dim;
 
@@ -1303,18 +1442,38 @@ int build_disk_index(const char *dataFilePath, const char *indexFilePath, const 
 
     if (param_list.size() >= 9 && atoi(param_list[8].c_str()) <= MAX_PQ_CHUNKS && atoi(param_list[8].c_str()) > 0)
     {
+#ifdef FAST_DISKANN
+        std::cout << "[PQ] Use quantized dimension (QD)  to overwrite derived quantized "
+                     "dimension from search_DRAM_budget (B)"
+                  << std::endl;
+#else
         std::cout << "Use quantized dimension (QD) to overwrite derived quantized "
                      "dimension from search_DRAM_budget (B)"
                   << std::endl;
+#endif
         num_pq_chunks = atoi(param_list[8].c_str());
     }
 
+#ifdef FAST_DISKANN
+    diskann::cout << "[PQ] Compressing " << dim << "-dimensional data into " << num_pq_chunks << " bytes per vector."
+                  << std::endl;
+#else
     diskann::cout << "Compressing " << dim << "-dimensional data into " << num_pq_chunks << " bytes per vector."
                   << std::endl;
+#endif
 
     generate_quantized_data<T>(data_file_to_use, pq_pivots_path, pq_compressed_vectors_path, compareMetric, p_val,
                                num_pq_chunks, use_opq, codebook_prefix);
     diskann::cout << timer.elapsed_seconds_for_step("generating quantized data") << std::endl;
+#ifdef FAST_DISKANN
+    {
+        auto e = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> diff = e - s;
+        diskann::cout << "[Time] Indexing time until now: " << diff.count() << std::endl;
+        double mem_used = diskann::get_max_rss_gb();
+        diskann::cout << "[Memory] Maximum used memory until now: " << mem_used << " GB" << std::endl;
+    }
+#endif
 
 // Gopal. Splitting diskann_dll into separate DLLs for search and build.
 // This code should only be available in the "build" DLL.
@@ -1328,6 +1487,16 @@ int build_disk_index(const char *dataFilePath, const char *indexFilePath, const 
                                                   build_pq_bytes, use_opq, num_threads, use_filters, labels_file_to_use,
                                                   labels_to_medoids_path, universal_label, Lf);
     diskann::cout << timer.elapsed_seconds_for_step("building merged vamana index") << std::endl;
+
+#ifdef FAST_DISKANN
+    {
+        auto e = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> diff = e - s;
+        diskann::cout << "[Time] Indexing time until now: " << diff.count() << std::endl;
+        double mem_used = diskann::get_max_rss_gb();
+        diskann::cout << "[Memory] Maximum used memory until now: " << mem_used << " GB" << std::endl;
+    }
+#endif
 
     timer.reset();
     if (!use_disk_pq)
@@ -1364,13 +1533,19 @@ int build_disk_index(const char *dataFilePath, const char *indexFilePath, const 
     }
     if (created_temp_file_for_processed_data)
         std::remove(prepped_base.c_str());
+#ifndef FAST_DISKANN
     std::remove(mem_index_path.c_str());
+#endif
     if (use_disk_pq)
         std::remove(disk_pq_compressed_vectors_path.c_str());
 
     auto e = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> diff = e - s;
     diskann::cout << "Indexing time: " << diff.count() << std::endl;
+#ifdef FAST_DISKANN
+    double mem_used = diskann::get_max_rss_gb();
+    diskann::cout << "Indexing maximum used memory: " << mem_used << " GB" << std::endl;
+#endif
 
     return 0;
 }

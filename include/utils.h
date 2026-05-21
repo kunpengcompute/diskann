@@ -1,4 +1,4 @@
-﻿// Copyright (c) Microsoft Corporation. All rights reserved.
+// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 
 #pragma once
@@ -17,6 +17,9 @@
 typedef HANDLE FileHandle;
 #else
 #include <unistd.h>
+#ifdef FAST_DISKANN
+#include <sys/mman.h>
+#endif
 typedef int FileHandle;
 #endif
 
@@ -35,6 +38,28 @@ typedef int FileHandle;
 #include "memory_mapped_files.h"
 #endif
 
+#ifdef FAST_DISKANN
+// Function: Get file size in bytes, returns -1 on failure
+inline uint64_t getFileSize(const std::string &filePath)
+{
+    // Open file in binary mode (read-only)
+    std::ifstream file(filePath, std::ios::binary);
+    if (!file.is_open())
+    { // Check if file opened successfully
+        diskann::cerr << "Error: Unable to open file " << filePath << std::endl;
+        return -1;
+    }
+    file.seekg(0, std::ios::end);
+    // Get current pointer position (i.e., file size)
+    std::streampos fileSize = file.tellg();
+
+    // (Optional) Move pointer back to beginning for subsequent reads
+    file.seekg(0, std::ios::beg);
+
+    file.close();
+    return fileSize;
+}
+#endif
 // taken from
 // https://github.com/Microsoft/BLAS-on-flash/blob/master/include/utils.h
 // round up X to the nearest multiple of Y
@@ -990,17 +1015,33 @@ inline void copy_aligned_data_from_file(const char *bin_file, T *&data, size_t &
 // NOTE :: good efficiency when total_vec_size is integral multiple of 64
 inline void prefetch_vector(const char *vec, size_t vecsize)
 {
+#ifdef FAST_DISKANN
+    size_t max_prefetch_size = (vecsize / 128) * 128;
+    for (size_t d = 0; d < max_prefetch_size; d += 128)
+    {
+        __builtin_prefetch((const char *)vec + d, 0, 3);
+    }
+#else
     size_t max_prefetch_size = (vecsize / 64) * 64;
     for (size_t d = 0; d < max_prefetch_size; d += 64)
         _mm_prefetch((const char *)vec + d, _MM_HINT_T0);
+#endif
 }
 
 // NOTE :: good efficiency when total_vec_size is integral multiple of 64
 inline void prefetch_vector_l2(const char *vec, size_t vecsize)
 {
+#ifdef FAST_DISKANN
+    size_t max_prefetch_size = (vecsize / 128) * 128;
+    for (size_t d = 0; d < max_prefetch_size; d += 128)
+    {
+        __builtin_prefetch((const char *)vec + d, 0, 2);
+    }
+#else
     size_t max_prefetch_size = (vecsize / 64) * 64;
     for (size_t d = 0; d < max_prefetch_size; d += 64)
         _mm_prefetch((const char *)vec + d, _MM_HINT_T1);
+#endif
 }
 
 // NOTE: Implementation in utils.cpp.

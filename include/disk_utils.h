@@ -1,4 +1,4 @@
-﻿// Copyright (c) Microsoft Corporation. All rights reserved.
+// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 
 #pragma once
@@ -31,8 +31,22 @@ typedef int FileHandle;
 #include "utils.h"
 #include "windows_customizations.h"
 
+#ifdef FAST_DISKANN
+#include <sys/resource.h>
+#endif
+
 namespace diskann
 {
+
+#ifdef FAST_DISKANN
+inline double get_max_rss_gb()
+{
+    struct rusage usage{};
+    getrusage(RUSAGE_SELF, &usage);
+    double rss_gb = usage.ru_maxrss / 1024.0 / 1024.0;
+    return rss_gb;
+}
+#endif
 const size_t MAX_SAMPLE_POINTS_FOR_WARMUP = 100000;
 const double PQ_TRAINING_SET_FRACTION = 0.1;
 const double SPACE_FOR_CACHED_NODES_IN_GB = 0.25;
@@ -42,6 +56,9 @@ const uint32_t WARMUP_L = 20;
 const uint32_t NUM_KMEANS_REPS = 12;
 
 template <typename T, typename LabelT> class PQFlashIndex;
+#ifdef FAST_DISKANN
+template <typename T, typename LabelT> class PQFlashIndexMGV2;
+#endif
 
 DISKANN_DLLEXPORT double get_memory_budget(const std::string &mem_budget_str);
 DISKANN_DLLEXPORT double get_memory_budget(double search_ram_budget_in_gb);
@@ -94,11 +111,11 @@ template <typename T, typename LabelT = uint32_t>
 DISKANN_DLLEXPORT int build_disk_index(
     const char *dataFilePath, const char *indexFilePath, const char *indexBuildParameters,
     diskann::Metric _compareMetric, bool use_opq = false,
-    const std::string &codebook_prefix = "", // default is empty for no codebook pass in
+    const std::string &codebook_prefix = "",
     bool use_filters = false,
-    const std::string &label_file = std::string(""), // default is empty string for no label_file
+    const std::string &label_file = std::string(""),
     const std::string &universal_label = "", const uint32_t filter_threshold = 0,
-    const uint32_t Lf = 0); // default is empty string for no universal label
+    const uint32_t Lf = 0);
 
 template <typename T>
 DISKANN_DLLEXPORT void create_disk_layout(const std::string base_file, const std::string mem_index_file,

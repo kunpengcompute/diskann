@@ -6,6 +6,7 @@
 
 namespace diskann
 {
+
 namespace defaults
 {
 const float ALPHA = 1.2f;
@@ -22,7 +23,12 @@ const float GRAPH_SLACK_FACTOR = 1.3;
 // SSD Index related limits
 const uint64_t MAX_GRAPH_DEGREE = 512;
 const uint64_t SECTOR_LEN = 4096;
+#ifdef FAST_DISKANN
+const uint64_t MAX_N_SECTOR_READS = 512;
+#else
 const uint64_t MAX_N_SECTOR_READS = 128;
+#endif
+const uint64_t MAX_IO_REQS_PER_QUERY = 128; // must be <= io_uring ring depth (MAX_EVENTS)
 
 // following constants should always be specified, but are useful as a
 // sensible default at cli / python boundaries

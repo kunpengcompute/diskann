@@ -148,7 +148,23 @@ template <typename T> class SSDQueryScratch : public AbstractScratch<T>
 
     tsl::robin_set<size_t> visited;
     NeighborPriorityQueue retset;
+#ifdef FAST_DISKANN
+    OriginNeighborPriorityQueue retset_lb;
+    std::vector<SmallNeighbor> full_retset;
+    std::vector<SmallNeighbor> pool;
+
+    // for async io
+    std::vector<struct iocb> cb_async;
+    std::vector<struct iocb *> cbs_async;
+    std::vector<io_event> evts_async;
+    std::vector<uint32_t> edges_buffer;
+
+    // for index build
+    std::vector<float> occlude_factor;
+    std::vector<uint32_t> pruned_list;
+#else
     std::vector<Neighbor> full_retset;
+#endif
 
     SSDQueryScratch(size_t aligned_dim, size_t visited_reserve);
     ~SSDQueryScratch();

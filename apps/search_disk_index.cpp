@@ -10,6 +10,9 @@
 #include "memory_mapper.h"
 #include "partition.h"
 #include "pq_flash_index.h"
+#ifdef FAST_DISKANN
+#include "pq_flash_index_mg_uring.h"
+#endif
 #include "timer.h"
 #include "percentile_stats.h"
 #include "program_options_utils.hpp"
@@ -67,7 +70,6 @@ int search_disk_index(diskann::Metric &metric, const std::string &index_path_pre
 
     std::string warmup_query_file = index_path_prefix + "_sample_data.bin";
 
-    // load query bin
     T *query = nullptr;
     uint32_t *gt_ids = nullptr;
     float *gt_dists = nullptr;
@@ -83,7 +85,7 @@ int search_disk_index(diskann::Metric &metric, const std::string &index_path_pre
             std::cout << "Error. Mismatch in number of queries and size of query "
                          "filters file"
                       << std::endl;
-            return -1; // To return -1 or some other error handling?
+            return -1;
         }
     }
 
@@ -98,6 +100,37 @@ int search_disk_index(diskann::Metric &metric, const std::string &index_path_pre
         calc_recall_flag = true;
     }
 
+#ifdef FAST_DISKANN
+    std::string mem_index_file = index_path_prefix + "_mem.index";
+    bool use_mg_v2 = file_exists(mem_index_file);
+    if (use_mg_v2 && filtered_search)
+    {
+        diskann::cout << "Filtered search not supported with memory graph, falling back to standard path." << std::endl;
+        use_mg_v2 = false;
+    }
+
+    std::shared_ptr<AlignedFileReader> reader = nullptr;
+    std::shared_ptr<AlignedFileReaderV2> reader2 = nullptr;
+    std::unique_ptr<diskann::PQFlashIndex<T, LabelT>> _pFlashIndex;
+    std::unique_ptr<diskann::PQFlashIndexMGV2<T, LabelT>> _pFlashIndex2;
+
+    if (use_mg_v2)
+    {
+        reader2.reset(new LinuxAlignedFileReaderV2());
+        _pFlashIndex2.reset(new diskann::PQFlashIndexMGV2<T, LabelT>(reader2, metric));
+    }
+    else
+    {
+        reader.reset(new LinuxAlignedFileReader());
+        _pFlashIndex.reset(new diskann::PQFlashIndex<T, LabelT>(reader, metric));
+    }
+
+    int res = 0;
+    if (use_mg_v2)
+        res = _pFlashIndex2->load(num_threads, index_path_prefix.c_str(), mem_index_file.c_str());
+    else
+        res = _pFlashIndex->load(num_threads, index_path_prefix.c_str());
+#else
     std::shared_ptr<AlignedFileReader> reader = nullptr;
 #ifdef _WINDOWS
 #ifndef USE_BING_INFRA
@@ -113,21 +146,27 @@ int search_disk_index(diskann::Metric &metric, const std::string &index_path_pre
         new diskann::PQFlashIndex<T, LabelT>(reader, metric));
 
     int res = _pFlashIndex->load(num_threads, index_path_prefix.c_str());
+#endif
 
     if (res != 0)
     {
+        diskann::aligned_free(query);
         return res;
     }
 
-    std::vector<uint32_t> node_list;
-    diskann::cout << "Caching " << num_nodes_to_cache << " nodes around medoid(s)" << std::endl;
-    _pFlashIndex->cache_bfs_levels(num_nodes_to_cache, node_list);
-    // if (num_nodes_to_cache > 0)
-    //     _pFlashIndex->generate_cache_list_from_sample_queries(warmup_query_file, 15, 6, num_nodes_to_cache,
-    //     num_threads, node_list);
-    _pFlashIndex->load_cache_list(node_list);
-    node_list.clear();
-    node_list.shrink_to_fit();
+#ifdef FAST_DISKANN
+    if (!use_mg_v2)
+    {
+#endif
+        std::vector<uint32_t> node_list;
+        diskann::cout << "Caching " << num_nodes_to_cache << " nodes around medoid(s)" << std::endl;
+        _pFlashIndex->cache_bfs_levels(num_nodes_to_cache, node_list);
+        _pFlashIndex->load_cache_list(node_list);
+        node_list.clear();
+        node_list.shrink_to_fit();
+#ifdef FAST_DISKANN
+    }
+#endif
 
     omp_set_num_threads(num_threads);
 
@@ -135,7 +174,11 @@ int search_disk_index(diskann::Metric &metric, const std::string &index_path_pre
     uint64_t warmup_num = 0, warmup_dim = 0, warmup_aligned_dim = 0;
     T *warmup = nullptr;
 
+#ifdef FAST_DISKANN
+    if (WARMUP && !use_mg_v2)
+#else
     if (WARMUP)
+#endif
     {
         if (file_exists(warmup_query_file))
         {
@@ -194,7 +237,6 @@ int search_disk_index(diskann::Metric &metric, const std::string &index_path_pre
     std::vector<std::vector<float>> query_result_dists(Lvec.size());
 
     uint32_t optimized_beamwidth = 2;
-
     double best_recall = 0.0;
 
     for (uint32_t test_id = 0; test_id < Lvec.size(); test_id++)
@@ -209,9 +251,16 @@ int search_disk_index(diskann::Metric &metric, const std::string &index_path_pre
 
         if (beamwidth <= 0)
         {
-            diskann::cout << "Tuning beamwidth.." << std::endl;
-            optimized_beamwidth =
-                optimize_beamwidth(_pFlashIndex, warmup, warmup_num, warmup_aligned_dim, L, optimized_beamwidth);
+#ifdef FAST_DISKANN
+            if (!use_mg_v2)
+            {
+#endif
+                diskann::cout << "Tuning beamwidth.." << std::endl;
+                optimized_beamwidth =
+                    optimize_beamwidth(_pFlashIndex, warmup, warmup_num, warmup_aligned_dim, L, optimized_beamwidth);
+#ifdef FAST_DISKANN
+            }
+#endif
         }
         else
             optimized_beamwidth = beamwidth;
@@ -220,7 +269,6 @@ int search_disk_index(diskann::Metric &metric, const std::string &index_path_pre
         query_result_dists[test_id].resize(recall_at * query_num);
 
         auto stats = new diskann::QueryStats[query_num];
-
         std::vector<uint64_t> query_result_ids_64(recall_at * query_num);
         auto s = std::chrono::high_resolution_clock::now();
 
@@ -229,22 +277,26 @@ int search_disk_index(diskann::Metric &metric, const std::string &index_path_pre
         {
             if (!filtered_search)
             {
-                _pFlashIndex->cached_beam_search(query + (i * query_aligned_dim), recall_at, L,
-                                                 query_result_ids_64.data() + (i * recall_at),
-                                                 query_result_dists[test_id].data() + (i * recall_at),
-                                                 optimized_beamwidth, use_reorder_data, stats + i);
+#ifdef FAST_DISKANN
+                if (use_mg_v2)
+                    _pFlashIndex2->cached_beam_search_v2(
+                        query + (i * query_aligned_dim), recall_at, L, query_result_ids_64.data() + (i * recall_at),
+                        query_result_dists[test_id].data() + (i * recall_at), optimized_beamwidth, false, 0,
+                        std::numeric_limits<uint32_t>::max(), use_reorder_data, stats + i);
+                else
+#endif
+                    _pFlashIndex->cached_beam_search(query + (i * query_aligned_dim), recall_at, L,
+                                                     query_result_ids_64.data() + (i * recall_at),
+                                                     query_result_dists[test_id].data() + (i * recall_at),
+                                                     optimized_beamwidth, use_reorder_data, stats + i);
             }
             else
             {
                 LabelT label_for_search;
                 if (query_filters.size() == 1)
-                { // one label for all queries
                     label_for_search = _pFlashIndex->get_converted_label(query_filters[0]);
-                }
                 else
-                { // one label for each query
                     label_for_search = _pFlashIndex->get_converted_label(query_filters[i]);
-                }
                 _pFlashIndex->cached_beam_search(
                     query + (i * query_aligned_dim), recall_at, L, query_result_ids_64.data() + (i * recall_at),
                     query_result_dists[test_id].data() + (i * recall_at), optimized_beamwidth, true, label_for_search,
@@ -325,7 +377,6 @@ int main(int argc, char **argv)
     {
         desc.add_options()("help,h", "Print information on arguments");
 
-        // Required parameters
         po::options_description required_configs("Required");
         required_configs.add_options()("data_type", po::value<std::string>(&data_type)->required(),
                                        program_options_utils::DATA_TYPE_DESCRIPTION);
@@ -343,7 +394,6 @@ int main(int argc, char **argv)
                                        po::value<std::vector<uint32_t>>(&Lvec)->multitoken()->required(),
                                        program_options_utils::SEARCH_LIST_DESCRIPTION);
 
-        // Optional parameters
         po::options_description optional_configs("Optional");
         optional_configs.add_options()("gt_file", po::value<std::string>(&gt_file)->default_value(std::string("null")),
                                        program_options_utils::GROUND_TRUTH_FILE_DESCRIPTION);
@@ -373,7 +423,6 @@ int main(int argc, char **argv)
                                        po::value<float>(&fail_if_recall_below)->default_value(0.0f),
                                        program_options_utils::FAIL_IF_RECALL_BELOW);
 
-        // Merge required and optional parameters
         desc.add(required_configs).add(optional_configs);
 
         po::variables_map vm;

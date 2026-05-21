@@ -4,7 +4,11 @@
 #include <limits>
 #include <malloc.h>
 #include <math_utils.h>
+#ifdef FAST_DISKANN
+#include <cblas.h>
+#else
 #include <mkl.h>
+#endif
 #include "logger.h"
 #include "utils.h"
 
@@ -29,7 +33,11 @@ void compute_vecs_l2sq(float *vecs_l2sq, float *data, const size_t num_points, c
 #pragma omp parallel for schedule(static, 8192)
     for (int64_t n_iter = 0; n_iter < (int64_t)num_points; n_iter++)
     {
+#ifdef FAST_DISKANN
+        vecs_l2sq[n_iter] = cblas_snrm2((int32_t)dim, (data + (n_iter * dim)), 1);
+#else
         vecs_l2sq[n_iter] = cblas_snrm2((MKL_INT)dim, (data + (n_iter * dim)), 1);
+#endif
         vecs_l2sq[n_iter] *= vecs_l2sq[n_iter];
     }
 }
@@ -45,8 +53,13 @@ void rotate_data_randomly(float *data, size_t num_points, size_t dim, float *rot
     }
     diskann::cout << "done Rotating data with random matrix.." << std::flush;
 
+    #ifdef FAST_DISKANN
+    cblas_sgemm(CblasRowMajor, CblasNoTrans, transpose, (int32_t)num_points, (int32_t)dim, (int32_t)dim, 1.0, data,
+                (int32_t)dim, rot_mat, (int32_t)dim, 0, new_mat, (int32_t)dim);
+#else
     cblas_sgemm(CblasRowMajor, CblasNoTrans, transpose, (MKL_INT)num_points, (MKL_INT)dim, (MKL_INT)dim, 1.0, data,
                 (MKL_INT)dim, rot_mat, (MKL_INT)dim, 0, new_mat, (MKL_INT)dim);
+#endif
 
     diskann::cout << "done." << std::endl;
 }
@@ -84,6 +97,16 @@ void compute_closest_centers_in_block(const float *const data, const size_t num_
         ones_b[i] = 1.0;
     }
 
+#ifdef FAST_DISKANN
+    cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans, (int32_t)num_points, (int32_t)num_centers, (int32_t)1, 1.0f,
+                docs_l2sq, (int32_t)1, ones_a, (int32_t)1, 0.0f, dist_matrix, (int32_t)num_centers);
+
+    cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans, (int32_t)num_points, (int32_t)num_centers, (int32_t)1, 1.0f,
+                ones_b, (int32_t)1, centers_l2sq, (int32_t)1, 1.0f, dist_matrix, (int32_t)num_centers);
+
+    cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans, (int32_t)num_points, (int32_t)num_centers, (int32_t)dim, -2.0f,
+                data, (int32_t)dim, centers, (int32_t)dim, 1.0f, dist_matrix, (int32_t)num_centers);
+#else
     cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans, (MKL_INT)num_points, (MKL_INT)num_centers, (MKL_INT)1, 1.0f,
                 docs_l2sq, (MKL_INT)1, ones_a, (MKL_INT)1, 0.0f, dist_matrix, (MKL_INT)num_centers);
 
@@ -93,6 +116,7 @@ void compute_closest_centers_in_block(const float *const data, const size_t num_
     cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans, (MKL_INT)num_points, (MKL_INT)num_centers, (MKL_INT)dim, -2.0f,
                 data, (MKL_INT)dim, centers, (MKL_INT)dim, 1.0f, dist_matrix, (MKL_INT)num_centers);
 
+#endif
     if (k == 1)
     {
 #pragma omp parallel for schedule(static, 8192)

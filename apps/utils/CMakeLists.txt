@@ -5,9 +5,24 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_COMPILE_WARNING_AS_ERROR ON)
 
 
+if(FAST_DISKANN)
+add_executable(extract_disk_vamana extract_disk_vamana.cpp)
+add_executable(extract_disk_vamana_fp16 extract_disk_vamana_fp16.cpp)
+add_executable(extract_mem_vamana extract_mem_vamana.cpp)
+add_executable(print_disk_vamana_header print_disk_vamana_header.cpp)
+add_executable(print_mem_vamana_header print_mem_vamana_header.cpp)
+add_executable(create_data_disk_layout create_data_disk_layout.cpp)
+target_link_libraries(create_data_disk_layout ${PROJECT_NAME})
+endif()
+
 add_executable(fvecs_to_bin fvecs_to_bin.cpp)
 
 add_executable(fvecs_to_bvecs fvecs_to_bvecs.cpp)
+
+if(FAST_DISKANN)
+add_executable(fbin_to_block fbin_to_block.cpp)
+target_link_libraries(fbin_to_block ${PROJECT_NAME})
+endif()
 
 add_executable(rand_data_gen rand_data_gen.cpp)
 target_link_libraries(rand_data_gen ${PROJECT_NAME} Boost::program_options)
