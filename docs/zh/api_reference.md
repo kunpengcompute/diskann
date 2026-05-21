@@ -1,6 +1,6 @@
 # API参考
 
-本文档详细说明鲲鹏优化相对于原始DiskANN开源代码的接口变动，仅对对外接口build_disk_index与search_disk_index做参数新增。
+本文档详细说明鲲鹏优化相对于原始DiskANN开源代码的接口变动，包括对外接口 build_disk_index 与 search_disk_index 的参数新增，以及新增的 search_disk_index_cache 接口。
 
 ## build_disk_index
 
@@ -107,6 +107,66 @@ int search_disk_index(
  
 ### 返回值
  
+| 返回值 | 说明 |
+|---|---|
+| `0` | 正常返回 |
+| `-1` | 失败（含 recall 低于 `fail_if_recall_below` 的情况） |
+
+---
+
+## search_disk_index_cache
+
+### 定义
+
+```cpp
+template <typename T>
+int search_disk_index_cache(
+    diskann::Metric &metric,
+    const std::string &index_path_prefix,
+    const std::string &result_output_prefix,
+    const std::string &query_file,
+    std::string &gt_file,
+    const uint32_t num_threads,
+    const uint32_t recall_at,
+    const float reorder_ratio,
+    const uint32_t beamwidth,
+    const double cache_budget_gb,
+    const std::string &graph_priority_file,
+    const uint32_t search_io_limit,
+    const std::vector<uint32_t> &Lvec,
+    const float fail_if_recall_below,
+    const uint32_t repeat_count,
+    const bool use_reorder_data = false
+);
+```
+
+### 用途
+
+基于内存缓存的搜索接口。将高优先级的图节点和向量缓存到内存中，减少磁盘 IO 次数，提升搜索性能。当命令行参数 `--cache_budget >= 0` 时进入此分支。
+
+### 参数说明
+
+| 参数名称 | 数据类型 | 描述 | 取值范围 |
+|---|---|---|---|
+| `metric` | `diskann::Metric` | 距离计算函数。 | `{l2, mips, cosine}`，推荐 `l2` |
+| `index_path_prefix` | `std::string` | 索引路径前缀。 | 非空，真实路径 |
+| `result_output_prefix` | `std::string` | 结果输出路径前缀。 | 非空，真实路径 |
+| `query_file` | `std::string` | 批次查询文件路径。 | 非空，真实路径 |
+| `gt_file` | `std::string` | 正确结果文件路径，仅验证 recall 时使用。 | 无限制，可以为空 |
+| `num_threads` | `uint32_t` | 线程数。 | 大于 1 的整数，默认为系统参数 |
+| `recall_at` | `uint32_t` | 召回率 top-K。 | 正整数 |
+| `reorder_ratio` | `float` | 控制精确距离计算的次数，有效值为 `reorder_ratio × top-k`。 | 大于 0，默认为 2.0 |
+| `beamwidth` | `uint32_t` | 搜索时一次 load 索引的个数。 | 正整数，默认为 1 |
+| `cache_budget_gb` | `double` | **【新增参数】** 缓存预算（GB）。`0` 表示不缓存但使用 cache 代码路径，`>0` 表示实际缓存预算。 | `>= 0` |
+| `graph_priority_file` | `std::string` | **【新增参数】** 图节点优先级文件路径，用于决定哪些节点优先缓存。 | 默认为 `"null"` |
+| `search_io_limit` | `uint32_t` | 单个查询的最大 IO 数量。 | 正整数，默认为最大值 |
+| `Lvec` | `std::vector<uint32_t>` | 搜索列表长度。 | 正整数列表 |
+| `fail_if_recall_below` | `float` | recall 可接受的最小值，低于此值返回 -1。 | 0–100，默认为 0 |
+| `repeat_count` | `uint32_t` | **【新增参数】** 重复搜索次数，用于取平均性能。 | 正整数，默认为 7 |
+| `use_reorder_data` | `bool` | 索引中是否包含全精度数据。 | `{true, false}`，默认为 `false` |
+
+### 返回值
+
 | 返回值 | 说明 |
 |---|---|
 | `0` | 正常返回 |

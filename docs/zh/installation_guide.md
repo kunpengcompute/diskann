@@ -21,10 +21,10 @@
     git clone --branch 0.7.0 --single-branch https://github.com/microsoft/DiskANN.git
     ```
 
-2. 获取基于鲲鹏优化的补丁文件，标签为**0.7.0-2606**。假设存放于“/path/to/diskann-patch“。
+2. 获取基于鲲鹏优化的补丁文件，标签为**v1.0.0**。假设存放于“/path/to/diskann-patch“。
 
     ```bash
-    git clone --branch 0.7.0-2606 https://gitcode.com/boostkit/diskann.git diskann-patch
+    git clone --branch v1.0.0 https://gitcode.com/boostkit/diskann.git diskann-patch
     ```
 
     >![](public_sys-resources/icon-note.gif) **说明：** 
@@ -81,7 +81,7 @@
     >![](public_sys-resources/icon-note.gif) **说明：** 
     >您可通过**make install PREFIX=/path/to/openblas/install**设置“/path/to/openblas/install“以指定安装路径，默认安装路径为“/opt/OpenBLAS“。
 
-5. 安装补丁文件0001-diskann\_0.7.0-optimize-neq.patch或0002-diskann\_0.7.0-optimize-eqv.patch。
+5. 安装全量补丁文件0001-diskann\_0.7.0-optimize-neq.patch或等价优化补丁0002-diskann\_0.7.0-optimize-eqv.patch。
 
     ```bash
     cd /path/to/DiskANN
@@ -89,7 +89,7 @@
     # patch -p1 < /path/to/diskann-patch/0002-diskann_0.7.0-optimize-eqv.patch
     ```
 
-    合入补丁后DiskANN完整的目录结构如下所示：
+    合入全量优化补丁后DiskANN完整的目录结构如下所示：
 
     ```text
     DiskANN
@@ -158,7 +158,13 @@
     └─ README.md
     ```
 
-6. 编译DiskANN代码获取二进制文件，文件位于bin文件夹下。注意：需启用鲲鹏优化宏以获得性能提升。
+6. 安装编译依赖。
+
+    ```bash
+    apt install make cmake g++ libaio-dev libgoogle-perftools-dev clang-format libboost-all-dev liburing-dev
+    ```
+
+7. 编译DiskANN代码获取二进制文件，文件位于bin文件夹下。注意：需启用鲲鹏优化宏以获得性能提升。
 
     ```bash
     cd /path/to/DiskANN

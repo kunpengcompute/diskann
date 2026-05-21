@@ -4,16 +4,20 @@
 
 ```text
 原始DiskANN v0.7.0 (x86_64)
-└── 0001-diskann-optimize-neq.patch  # 非等价优化版本（改变搜索行为）
+├── 0001-diskann_0.7.0-optimize-neq.patch  # 全量优化版本（改变搜索行为）
+│   ├── ARM64 NEON向量化（IP/L2距离计算 + PQ 8bit查表）
+│   ├── 数据布局优化（邻接表驻留内存，原始向量留SSD）
+│   ├── 异步IO流水化（CPU计算与SSD读取并行重叠）
+│   ├── 精排队列缩减（reorder_ratio × top-k，降低IO次数）
+│   └── 内存缓存加速（cache_budget，高频节点/向量驻留内存）
+└── 0002-diskann_0.7.0-optimize-eqv.patch  # 等价优化版本（不改变搜索行为，仅加速）
     ├── ARM64 NEON向量化（IP/L2距离计算 + PQ 8bit查表）
-    ├── 数据布局优化（邻接表驻留内存，原始向量留SSD）
-    ├── 异步IO流水化（CPU计算与SSD读取并行重叠）
-    └── 精排队列缩减（reorder_ratio × top-k，降低IO次数）
+    └── 异步IO流水化（CPU计算与SSD读取并行重叠）
 ```
 
-## 非等价算法优化（0001-diskann-optimize-neq.patch）
+## 全量优化（0001-diskann_0.7.0-optimize-neq.patch）
 
-基于开源DiskANN v0.7.0做侵入式修改，针对鲲鹏950平台（ARM64 NEON）进行全链路性能优化，目标为性能对比9654达成1.3x，召回率≥0.99。
+基于开源DiskANN v0.7.0做侵入式修改，针对鲲鹏950平台（ARM64 NEON）进行全链路性能优化。
 
 ### 主要优化内容
 
@@ -79,3 +83,38 @@ CPU计算与SSD读取形成流水线，消除了同步IO的等待间隙，在IOP
 
 - 仅对PQ粗距离排名前`reorder_ratio × K`的候选节点加载原始向量并计算精确L2距离。
 - 其余候选节点直接丢弃，不产生IO开销。
+
+### 内存缓存加速详解
+
+在异步IO流水化的基础上，搜索阶段仍需从SSD加载原始向量。对于访问频率高的热点节点（如入口点附近的节点），每次查询都重复读取SSD是低效的。
+
+#### 缓存机制
+
+通过`cache_budget`参数指定缓存预算（GB），系统在加载索引后将高优先级的图节点和对应向量缓存到内存中：
+
+1. 根据`graph_priority_file`（节点优先级文件）确定缓存顺序，优先缓存被访问频率最高的节点。
+2. 搜索时先检查候选节点是否已缓存，命中则直接从内存读取，跳过SSD IO。
+3. 未命中的节点仍走异步IO路径从SSD加载。
+
+#### 使用方式
+
+- 命令行参数`--cache_budget 2.0`指定2GB缓存预算。
+- `--graph_priority_file`指定节点优先级文件路径（可通过`calculate_hops_from_entry`工具生成）。
+- `cache_budget = 0`表示不缓存但使用cache代码路径，`cache_budget = -1`（默认）走非cache路径。
+
+#### 效果
+
+在内存充足的场景下，通过缓存高频节点可显著减少SSD访问次数，降低尾延迟，提升高并发场景下的搜索吞吐。
+
+---
+
+## 等价优化（0002-diskann_0.7.0-optimize-eqv.patch）
+
+等价优化是全量优化的子集，仅包含**不改变搜索行为**的优化项。
+
+### 包含的优化
+
+| 优化项 | 说明 |
+|--------|------|
+| ARM64 NEON向量化 | IP/L2距离计算、PQ 8bit查表替换为NEON intrinsics |
+| 异步IO流水化 | 精排阶段使用io_uring异步读取原始向量，CPU计算与IO重叠 |
