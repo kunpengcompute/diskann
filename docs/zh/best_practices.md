@@ -130,4 +130,4 @@
 
 测试结果如下所示：
 
-<img src="figures/diskann-best_practices-eqv.jpg" alt="faiss-best_practices-neq" width="600"/>
+<img src="figures/diskann-best_practices-eqv.jpg" alt="faiss-best_practices-eqv" width="600"/>
