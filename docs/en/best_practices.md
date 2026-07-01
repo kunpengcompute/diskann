@@ -68,7 +68,7 @@ The test result is as follows:
 
 ## Equivalence Optimization
 
-This section describes how to test DiskANN after equivalence optimization on the Kunpeng platform. The test depends on the Kunpeng non-equivalence optimization patch file `0002-diskann_0.7.0-optimize-eqv.patch`. The `sift1M` dataset is used as an example.
+This section describes how to test DiskANN after equivalence optimization on the Kunpeng platform. The test depends on the Kunpeng equivalence optimization patch file `0002-diskann_0.7.0-optimize-eqv.patch`. The `sift1M` dataset is used as an example.
 
 **Obtaining the Dataset and Test Program**
 

@@ -2,7 +2,7 @@
 
 ## Latest Updates
 
-- [2026-03-30]: The DiskANN optimization patches were released on the Gitcode platform, implementing both equivalence and non-equivalence index optimizations.
+- [2026-06-30]: The DiskANN optimization patches were released on the Gitcode platform, implementing both equivalence and non-equivalence index optimizations.
 
 ## Project Introduction
 

@@ -110,7 +110,6 @@ int search_disk_index(
 | Return Value | Description |
 | --- | --- |
 | `0` | Normal execution |
-<<<<<<< HEAD
 | `-1` | Failure (including the case where recall is lower than `fail_if_recall_below`) |
 
 ## search_disk_index_cache
