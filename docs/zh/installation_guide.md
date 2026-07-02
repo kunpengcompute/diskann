@@ -15,13 +15,13 @@
 
 从GitHub获取DiskANN开源代码，安装必要的依赖工具、库，从GitCode获取基于鲲鹏平台优化后的Patch然后重新编译DiskANN，以便应用优化后特性，降低计算时延，提升计算效率。
 
-1. 获取DiskANN开源代码，标签为**0.7.0**。假设代码存放于“/path/to/DiskANN“。
+1. 获取DiskANN开源代码，标签为**0.7.0**。假设代码存放于“/path/to/DiskANN”。
 
     ```bash
     git clone --branch 0.7.0 --single-branch https://github.com/microsoft/DiskANN.git
     ```
 
-2. 获取基于鲲鹏优化的补丁文件，标签为**v1.0.0**。假设存放于“/path/to/diskann-patch“。
+2. 获取基于鲲鹏优化的补丁文件，标签为**v1.0.0**。假设存放于“/path/to/diskann-patch”。
 
     ```bash
     git clone --branch v1.0.0 https://gitcode.com/boostkit/diskann.git diskann-patch
@@ -29,8 +29,8 @@
 
     >**说明：** 
     >鲲鹏优化补丁文件描述如下，请根据需要自行选择：
-    >- 0001-diskann\_1.8.0-optimize-neq.patch：全量优化补丁，性能最优，保证精度，但不保证Top-K的值或顺序与原生完全一致。
-    >- 0002-diskann\_1.8.0-optimize-eqv.patch：等价优化补丁，保证Top-K的值与顺序与原生保持完全一致。
+    >- 0001-diskann\_0.7.0-optimize-neq.patch：全量优化补丁，性能最优，保证精度，但不保证Top-K的值或顺序与原生完全一致。
+    >- 0002-diskann\_0.7.0-optimize-eqv.patch：等价优化补丁，保证Top-K的值与顺序与原生保持完全一致。
 
 3. 安装LLVM 16.0.6。
 
@@ -64,7 +64,7 @@
        export PATH=/opt/llvm-16.0.6/bin:$PATH
        ```
 
-4. DiskANN依赖数学库，从[Github仓](https://github.com/OpenMathLib/OpenBLAS.git)下载开源OpenBLAS源代码，标签为**v0.3.29**。保存在编译机器可访问的路径中，假设位于“/path/to/OpenBLAS-0.3.29“。
+4. DiskANN依赖数学库，从[Github仓](https://github.com/OpenMathLib/OpenBLAS)下载开源OpenBLAS源代码，标签为**v0.3.29**。保存在编译机器可访问的路径中，假设位于“/path/to/OpenBLAS-0.3.29”。
 
     ```bash
     git clone --branch v0.3.29 --single-branch https://github.com/OpenMathLib/OpenBLAS.git
