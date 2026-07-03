@@ -32,9 +32,9 @@ int build_disk_index(
 
 | 参数名称 | 数据类型 | 描述 | 取值范围 |
 |---|---|---|---|
-| `dataFilePath` | `const char` | 输入数据集文件，二进制形式。 | 非空，真实路径 |
-| `indexFilePath` | `const char` | 输出，索引路径前缀，如`/mnt/data/my_ann_index`。 | 非空，真实路径 |
-| `indexBuildParameters` | `const char` | 输入参数组合，包括图邻居数R、search节点候选队列长度L、search阶段内存预算B、构建内存预算M、线程数num_threads、PQ索引字节数disk_PQ、是否在数据文件中包含全精度数据reorder、构建索引的字节数PQ、PQ量化维度QD。 | 5~9个由空格隔开的参数组合 |
+| `dataFilePath` | `const char *` | 输入数据集文件，二进制形式。 | 非空，真实路径 |
+| `indexFilePath` | `const char *` | 输出，索引路径前缀，如`/mnt/data/my_ann_index`。 | 非空，真实路径 |
+| `indexBuildParameters` | `const char *` | 输入参数组合，包括图邻居数R、search节点候选队列长度L、search阶段内存预算B、构建内存预算M、线程数num_threads、PQ索引字节数disk_PQ、是否在数据文件中包含全精度数据reorder、构建索引的字节数PQ、PQ量化维度QD。 | 5~9个由空格隔开的参数组合 |
 | `compareMetric` | `diskann::Metric` | 距离计算函数。 | `{l2, mips, cosine}`，推荐 `l2` |
 | `use_opq` | `bool` | 是否使用OPQ算法进行PQ计算。 | `{true, false}` |
 | `codebook_prefix` | `const std::string` | 预训练码本的路径前缀。 | 默认为空 |
@@ -104,13 +104,12 @@ int search_disk_index(
 | `fail_if_recall_below` | `const float` | recall可接受的最小值，低于此值返回-1。 | 0~100，默认为 0 |
 | `query_filters` | `const std::vector<std::string>` | 查询的筛选标签。1个标签对所有查询生效，多个标签与每个查询一一对应（当前不涉及）。 | 无限制，默认为空 |
 | `use_reorder_data` | `const bool` | 索引中是否包含全精度数据，仅在SSD上与压缩数据结合使用。 | `{true, false}`，默认为 `false` |
- 
+
 ### 返回值
- 
+
 | 返回值 | 说明 |
 |---|---|
 | `0` | 正常返回 |
-<<<<<<< HEAD
 | `-1` | 失败（含recall低于`fail_if_recall_below`的情况） |
 
 ## search_disk_index_cache

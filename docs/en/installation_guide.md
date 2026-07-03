@@ -138,7 +138,7 @@ Obtain the open-source code of DiskANN from the GitHub repository. Install neces
     │   │   ├─ disk_utils.cpp                      // Disk utility implementation
     │   │   ├─ distance.cpp                        // Distance calculation implementation
     │   │   ├─ filter_utils.cpp                    // Filtering utility implementation
-    │ │ ├─ index.cpp // Memory index implementation
+    │   ├─ index.cpp // Memory index implementation
     │   │   ├─ io_uring_aligned_file_reader.cpp    // io_uring aligned file reader implementation
     │   │   ├─ linux_aligned_file_reader.cpp       // Linux aligned file reader implementation
     │   │   ├─ logger.cpp                          // Logger implementation

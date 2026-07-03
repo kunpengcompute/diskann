@@ -64,7 +64,7 @@ This section describes how to test DiskANN after non-equivalence optimization on
 
 The test result is as follows:
 
-<img src="figures/diskann-best_practices-neq.jpg" alt="faiss-best_practices-neq" width="800"/>
+<img src="figures/diskann-best_practices-neq.jpg" alt="diskann-best_practices-neq" width="800"/>
 
 ## Equivalence Optimization
 
@@ -130,4 +130,4 @@ This section describes how to test DiskANN after equivalence optimization on the
 
 The test result is as follows:
 
-<img src="figures/diskann-best_practices-eqv.jpg" alt="faiss-best_practices-neq" width="600"/>
+<img src="figures/diskann-best_practices-eqv.jpg" alt="diskann-best_practices-eqv" width="600"/>

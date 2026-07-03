@@ -64,7 +64,7 @@
 
 测试结果如下所示：
 
-<img src="figures/diskann-best_practices-neq.jpg" alt="faiss-best_practices-neq" width="800"/>
+<img src="figures/diskann-best_practices-neq.jpg" alt="diskann-best_practices-neq" width="800"/>
 
 ## 等价优化
 
@@ -130,4 +130,4 @@
 
 测试结果如下所示：
 
-<img src="figures/diskann-best_practices-eqv.jpg" alt="faiss-best_practices-eqv" width="600"/>
+<img src="figures/diskann-best_practices-eqv.jpg" alt="diskann-best_practices-eqv" width="600"/>

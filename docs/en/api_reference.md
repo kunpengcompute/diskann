@@ -32,9 +32,9 @@ int build_disk_index(
 
 | Parameter | Data Type | Description | Value Range |
 | --- | --- | --- | --- |
-| `dataFilePath` | `const char` | Input dataset file in binary format. | A non-empty, actual path. |
-| `indexFilePath` | `const char` | Output, the index path prefix, for example, `/mnt/data/my_ann_index`. | A non-empty, actual path. |
-| `indexBuildParameters` | `const char` | Input parameter combination, including the number of graph neighbors `R`, length `L` of the candidate node queue for search, memory budget `B` for the search phase, memory budget `M` for the build phase, thread count `num_threads`, PQ index bytes `disk_PQ`, `reorder` (indicating whether to include full-precision data in the data file), `PQ` indicating the number of PQ bytes used for building the index, and PQ quantization dimension `QD`. | A combination of 5 to 9 parameters separated by spaces. |
+| `dataFilePath` | `const char *` | Input dataset file in binary format. | A non-empty, actual path. |
+| `indexFilePath` | `const char *` | Output, the index path prefix, for example, `/mnt/data/my_ann_index`. | A non-empty, actual path. |
+| `indexBuildParameters` | `const char *` | Input parameter combination, including the number of graph neighbors `R`, length `L` of the candidate node queue for search, memory budget `B` for the search phase, memory budget `M` for the build phase, thread count `num_threads`, PQ index bytes `disk_PQ`, `reorder` (indicating whether to include full-precision data in the data file), `PQ` indicating the number of PQ bytes used for building the index, and PQ quantization dimension `QD`. | A combination of 5 to 9 parameters separated by spaces. |
 | `compareMetric` | `diskann::Metric` | Distance calculation function. | `{l2, mips, cosine}`. `l2` is recommended. |
 | `use_opq` | `bool` | Indicates whether to use the OPQ algorithm for PQ calculation. | `{true, false}` |
 | `codebook_prefix` | `const std::string` | Path prefix of the pre-trained codebook. | The default value is empty. |
@@ -156,7 +156,7 @@ int search_disk_index_cache(
 | `reorder_ratio` | `const float` | Controls the number of exact distance calculations. The effective value is `reorder_ratio × top-k`. | Greater than 0. The default value is `2.0`. |
 | `beamwidth` | `const uint32_t` | Beam width (number of nodes loaded at a time) during search. | Positive integer. The default value is `1`. |
 | `cache_budget_gb` | `const double` | **New parameter**, which indicates the cache budget (GB). The value `0` disables caching but executes the cache code path, while `> 0` specifies the actual cache budget. | `>= 0` |
-| `graph_priority_file` | `const std::string` | **New parameter**, which indicates the path to the graph node priority file for determining the caching priority of different nodes. | The default value is **''null''**. |
+| `graph_priority_file` | `const std::string` | **New parameter**, which indicates the path to the graph node priority file for determining the caching priority of different nodes. | The default value is <code>''null''</code>. |
 | `search_io_limit` | `const uint32_t` | Maximum number of I/Os in a single query. | Positive integer. The default value is the maximum value. |
 | `Lvec` | `const std::vector<uint32_t>` | Length of the search list. | List of positive integers. |
 | `fail_if_recall_below` | `const float` | Minimum acceptable recall rate. If the query recall drops below this threshold, the function returns `-1`. | 0 to 100. The default value is `0`. |
