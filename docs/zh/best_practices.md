@@ -64,11 +64,11 @@
 
 测试结果如下所示：
 
-<img src="figures/diskann-best_practices-neq.jpg" alt="faiss-best_practices-neq" width="800"/>
+<img src="figures/diskann-best_practices-neq.jpg" alt="diskann-best_practices-neq" width="800"/>
 
 ## 等价优化
 
-本节介绍在鲲鹏平台测试全量优化后DiskANN的方法，依赖鲲鹏的全量优化补丁文件0002-diskann\_0.7.0-optimize-eqv.patch。使用示例为sift1M数据集。
+本节介绍在鲲鹏平台测试等价优化后DiskANN的方法，依赖鲲鹏的等价优化补丁文件0002-diskann\_0.7.0-optimize-eqv.patch。使用示例为sift1M数据集。
 
 **获取数据集与测试程序**
 
@@ -130,4 +130,4 @@
 
 测试结果如下所示：
 
-<img src="figures/diskann-best_practices-eqv.jpg" alt="faiss-best_practices-neq" width="600"/>
+<img src="figures/diskann-best_practices-eqv.jpg" alt="diskann-best_practices-eqv" width="600"/>
