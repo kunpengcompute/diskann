@@ -233,6 +233,14 @@ float DistanceL2Float::compare(const float *a, const float *b, uint32_t size) co
     }
 
     result = vaddvq_f32(acc);
+    for (; i * 4 < (int32_t)size; i++)
+    {
+        for (int32_t j = 0; j < 4 && i * 4 + j < (int32_t)size; j++)
+        {
+            float diff = a[i * 4 + j] - b[i * 4 + j];
+            result += diff * diff;
+        }
+    }
 
 #else
 #pragma omp simd reduction(+ : result) aligned(a, b : 32)
