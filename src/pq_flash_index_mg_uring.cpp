@@ -873,7 +873,7 @@ void PQFlashIndexMGV2<T, LabelT>::cached_beam_search_v2(const T *query1, const u
     // // Iterate all retset entries, only the first reorder_vector_num points.
     // // If already loaded, it was prefetched asynchronously; otherwise, add to list for later loading.
     // // Note: this iterates reorder_vector_num entries, not the full L length.
-    for (uint32_t i = 0; i < reorder_vector_num; i++)
+    for (uint32_t i = 0; i < reorder_vector_num && i < retset.size(); i++)
     {
         auto id = retset[i].id;
         if (!retset[i].loaded)
@@ -961,7 +961,8 @@ void PQFlashIndexMGV2<T, LabelT>::cached_beam_search_v2(const T *query1, const u
     }
 
     // copy k_search values
-    for (uint64_t i = 0; i < k_search; i++)
+    size_t copy_count = std::min(static_cast<size_t>(k_search), retset_lb.size());
+    for (uint64_t i = 0; i < copy_count; i++)
     {
         indices[i] = retset_lb[i].id;
         auto key = (uint32_t)indices[i];
@@ -1731,7 +1732,7 @@ void PQFlashIndexMGV2<T, LabelT>::cached_beam_search(const T *query1, const uint
         stats->cpu_us += (float)cpu_timer.elapsed();
     }
 
-    for (uint32_t i = 0; i < reorder_vector_num; i++)
+    for (uint32_t i = 0; i < reorder_vector_num && i < retset.size(); i++)
     {
         auto id = retset[i].id;
         if constexpr (ReorderCompressed)
@@ -1834,7 +1835,8 @@ void PQFlashIndexMGV2<T, LabelT>::cached_beam_search(const T *query1, const uint
         stats->io_us += io_timer.elapsed();
     }
 
-    for (uint64_t i = 0; i < k_search; i++)
+    size_t copy_count = std::min(static_cast<size_t>(k_search), retset_lb.size());
+    for (uint64_t i = 0; i < copy_count; i++)
     {
         indices[i] = retset_lb[i].id;
         auto key = (uint32_t)indices[i];
