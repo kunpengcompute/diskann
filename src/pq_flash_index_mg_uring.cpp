@@ -815,7 +815,7 @@ void PQFlashIndexMGV2<T, LabelT>::cached_beam_search_v2(const T *query1, const u
         stats->cpu_us += (float)cpu_timer.elapsed();
     }
 
-    for (uint32_t i = 0; i < reorder_vector_num; i++)
+    for (uint32_t i = 0; i < reorder_vector_num && i < retset.size(); i++)
     {
         auto id = retset[i].id;
         if (!retset[i].loaded)
@@ -903,7 +903,7 @@ void PQFlashIndexMGV2<T, LabelT>::cached_beam_search_v2(const T *query1, const u
     }
 
     // copy k_search values
-    for (uint64_t i = 0; i < k_search; i++)
+    for (uint64_t i = 0; i < std::min(k_search, (uint64_t)retset_lb.size()); i++)
     {
         indices[i] = retset_lb[i].id;
         auto key = (uint32_t)indices[i];
