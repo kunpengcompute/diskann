@@ -21,7 +21,7 @@
     git clone --branch 0.7.0 --single-branch https://github.com/microsoft/DiskANN.git
     ```
 
-2. 获取基于鲲鹏优化的补丁文件，标签为**v1.0.0**，然后重新编译DiskANN，以便应用优化后特性，降低计算时延，提升计算效率。假设存放于“/path/to/diskann-patch”。
+2. 获取基于鲲鹏优化的补丁文件，标签为**v1.0.0**。假设存放于“/path/to/diskann-patch”。
 
     ```bash
     git clone --branch v1.0.0 https://gitcode.com/boostkit/diskann.git diskann-patch
@@ -180,4 +180,4 @@
 
 |文档版本|发布日期|修改说明|
 |--|--|--|
-|01|2026-03-30|第一次正式发布。|
+|01|2026-06-30|第一次正式发布。|

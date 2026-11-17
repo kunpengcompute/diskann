@@ -32,9 +32,9 @@ int build_disk_index(
 
 | 参数名称 | 数据类型 | 描述 | 取值范围 |
 |---|---|---|---|
-| dataFilePath | const char | 输入数据集文件，二进制形式。 | 非空，真实路径 |
-| indexFilePath | const char | 输出，索引路径前缀，如/mnt/data/my_ann_index。 | 非空，真实路径 |
-| indexBuildParameters | const char | 输入参数组合，包括图邻居数R、search节点候选队列长度L、search阶段内存预算B、构建内存预算M、线程数num_threads、PQ索引字节数disk_PQ、是否在数据文件中包含全精度数据reorder、构建索引的字节数PQ、PQ量化维度QD。 | 5~9个由空格隔开的参数组合 |
+| dataFilePath | const char * | 输入数据集文件，二进制形式。 | 非空，真实路径 |
+| indexFilePath | const char * | 输出，索引路径前缀，如/mnt/data/my_ann_index。 | 非空，真实路径 |
+| indexBuildParameters | const char * | 输入参数组合，包括图邻居数R、search节点候选队列长度L、search阶段内存预算B、构建内存预算M、线程数num_threads、PQ索引字节数disk_PQ、是否在数据文件中包含全精度数据reorder、构建索引的字节数PQ、PQ量化维度QD。 | 5~9个由空格隔开的参数组合 |
 | compareMetric | diskann::Metric | 距离计算函数。 | {l2, mips, cosine}，推荐l2 |
 | use_opq | bool | 是否使用OPQ算法进行PQ计算。 | {true, false} |
 | codebook_prefix | const std::string | 预训练码本的路径前缀。 | 默认为空 |
