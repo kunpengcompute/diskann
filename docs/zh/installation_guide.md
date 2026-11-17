@@ -1,5 +1,7 @@
 # 安装指南
 
+本文档介绍DiskANN安装指南，提供已验证环境说明与编译安装步骤，适用于需要安装DiskANN的用户。
+
 ## 已验证环境
 
 为保证您可以顺利安全地使用DiskANN，请确保所使用的环境信息在已验证环境范围内。
@@ -13,24 +15,21 @@
 
 ## 编译安装
 
-从GitHub获取DiskANN开源代码，安装必要的依赖工具、库，从GitCode获取基于鲲鹏平台优化后的Patch然后重新编译DiskANN，以便应用优化后特性，降低计算时延，提升计算效率。
-
-1. 获取DiskANN开源代码，标签为**0.7.0**。假设代码存放于“/path/to/DiskANN”。
+1. 获取DiskANN开源代码，安装必要的依赖工具、库，标签为**0.7.0**。假设代码存放于“/path/to/DiskANN”。
 
     ```bash
     git clone --branch 0.7.0 --single-branch https://github.com/microsoft/DiskANN.git
     ```
 
-2. 获取基于鲲鹏优化的补丁文件，标签为**v1.0.0**。假设存放于“/path/to/diskann-patch”。
+2. 获取基于鲲鹏优化的补丁文件，标签为**v1.0.0**，然后重新编译DiskANN，以便应用优化后特性，降低计算时延，提升计算效率。假设存放于“/path/to/diskann-patch”。
 
     ```bash
     git clone --branch v1.0.0 https://gitcode.com/boostkit/diskann.git diskann-patch
     ```
 
-    >**说明：** 
-    >鲲鹏优化补丁文件描述如下，请根据需要自行选择：
-    >- 0001-diskann\_0.7.0-optimize-neq.patch：全量优化补丁，性能最优，保证精度，但不保证Top-K的值或顺序与原生完全一致。
-    >- 0002-diskann\_0.7.0-optimize-eqv.patch：等价优化补丁，保证Top-K的值与顺序与原生保持完全一致。
+    鲲鹏优化补丁文件描述如下，请根据需要自行选择：
+    - 0001-diskann\_0.7.0-optimize-neq.patch：全量优化补丁，性能最优，保证精度，但不保证Top-K的值或顺序与原生完全一致。
+    - 0002-diskann\_0.7.0-optimize-eqv.patch：等价优化补丁，保证Top-K的值与顺序与原生保持完全一致。
 
 3. 安装LLVM 16.0.6。
 
@@ -78,8 +77,7 @@
     make install
     ```
 
-    >**说明：** 
-    >您可通过**make install PREFIX=/path/to/openblas/install**设置“/path/to/openblas/install”以指定安装路径，默认安装路径为“/opt/OpenBLAS”。
+    可通过**make install PREFIX=/path/to/openblas/install**设置“/path/to/openblas/install”以指定安装路径，默认安装路径为“/opt/OpenBLAS”。
 
 6. 安装全量补丁文件0001-diskann\_0.7.0-optimize-neq.patch或等价优化补丁0002-diskann\_0.7.0-optimize-eqv.patch。
 
@@ -177,3 +175,9 @@
      - **-DFAST_DISKANN=ON**：性能最优，保证精度，但不保证Top-K的值或顺序与原生完全一致；
    - 若您选择使用等价优化补丁0002-diskann\_0.7.0-optimize-eqv.patch，可选择开启以下宏获得性能提升：
      - **-DFAST_DISKANN=ON**：保证Top-K的值与顺序与原生保持完全一致。
+
+## 修订记录
+
+|文档版本|发布日期|修改说明|
+|--|--|--|
+|01|2026-03-30|第一次正式发布。|
