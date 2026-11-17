@@ -41,7 +41,7 @@
 
 2. 请参考《[安装指南](./installation_guide.md)》编译DiskANN。
 
-   作为全量优化后DiskANN测试，需开启与鲲鹏优化相关的宏 **-DFAST\_DISKANN=ON**。
+   全量优化DiskANN测试，需开启与鲲鹏优化相关的宏 **-DFAST\_DISKANN=ON**。
 
 3. 处理数据集。
 
@@ -107,7 +107,7 @@
 
 2. 请参考《[安装指南](./installation_guide.md)》编译DiskANN。
 
-   作为等价优化后DiskANN测试，需开启与鲲鹏优化相关的宏 **-DFAST\_DISKANN=ON**。
+   等价优化DiskANN测试，需开启与鲲鹏优化相关的宏 **-DFAST\_DISKANN=ON**。
 
 3. 处理数据集。
 
@@ -138,4 +138,4 @@
 
 |文档版本|发布日期|修改说明|
 |--|--|--|
-|01|2026-03-30|第一次正式发布。|
+|01|2026-06-30|第一次正式发布。|
