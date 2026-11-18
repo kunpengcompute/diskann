@@ -1,5 +1,7 @@
 # 特性指南
 
+本文档介绍DiskANN v0.7.0针对鲲鹏950处理器的全量与等价优化特性，涵盖ARM64 NEON向量化、数据布局优化、异步IO流水化与精排队列缩减等核心优化方案，适用于需要在ARM64平台上部署和调优DiskANN向量检索系统的用户。
+
 ## 技术架构
 
 ```text
@@ -17,7 +19,7 @@
 
 ## 全量优化（0001-diskann_0.7.0-optimize-neq.patch）
 
-基于开源DiskANN v0.7.0做侵入式修改，针对鲲鹏950平台（ARM64 NEON）进行全链路性能优化。
+基于开源DiskANN v0.7.0做侵入式修改，针对鲲鹏950处理器（ARM64 NEON）进行全链路性能优化。
 
 ### 主要优化内容
 
@@ -33,14 +35,14 @@
 
 | 文件 | 变更类型 | 说明 |
 |------|---------|------|
-| `include/compressed_graph.h` | 新增 | 压缩图数据结构，使用变长整数编码优化存储 |
-| `include/io_uring_aligned_file_reader.h` | 新增 | 基于io_uring的高性能异步文件读取器（LinuxAlignedFileReaderV2） |
-| `include/pq_flash_index_mg_uring.h` | 新增 | 使用io_uring的PQFlashIndexMGV2索引类 |
-| `include/scratch_uring.h` | 新增 | io_uring查询临时缓冲区管理（ScratchStoreManagerV2） |
-| `include/log.h` | 新增 | 日志工具类，提供统一的日志输出接口 |
-| `src/io_uring_aligned_file_reader.cpp` | 新增 | LinuxAlignedFileReaderV2实现，封装io_uring系统调用 |
-| `src/pq_flash_index_mg_uring.cpp` | 新增 | PQFlashIndexMGV2实现，支持增量构建和压缩图 |
-| `src/scratch_uring.cpp` | 新增 | ScratchStoreManagerV2实现，管理查询临时内存池 |
+| include/compressed_graph.h | 新增 | 压缩图数据结构，使用变长整数编码优化存储 |
+| include/io_uring_aligned_file_reader.h | 新增 | 基于io_uring的高性能异步文件读取器（LinuxAlignedFileReaderV2） |
+| include/pq_flash_index_mg_uring.h | 新增 | 使用io_uring的PQFlashIndexMGV2索引类 |
+| include/scratch_uring.h | 新增 | io_uring查询临时缓冲区管理（ScratchStoreManagerV2） |
+| include/log.h | 新增 | 日志工具类，提供统一的日志输出接口 |
+| src/io_uring_aligned_file_reader.cpp | 新增 | LinuxAlignedFileReaderV2实现，封装io_uring系统调用 |
+| src/pq_flash_index_mg_uring.cpp | 新增 | PQFlashIndexMGV2实现，支持增量构建和压缩图 |
+| src/scratch_uring.cpp | 新增 | ScratchStoreManagerV2实现，管理查询临时内存池 |
 
 ### 数据布局优化详解
 
@@ -116,3 +118,9 @@ CPU计算与SSD读取形成流水线，消除了同步IO的等待间隙，在IOP
 |--------|------|
 | ARM64 NEON向量化 | IP/L2距离计算、PQ 8bit查表替换为NEON intrinsics |
 | 异步IO流水化 | 精排阶段使用io_uring异步读取原始向量，CPU计算与IO重叠 |
+
+## 修订记录
+
+|文档版本|发布日期|修改说明|
+|--|--|--|
+|01|2026-06-30|第一次正式发布。|
