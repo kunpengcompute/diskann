@@ -1,32 +1,17 @@
 # 版本说明书
 
+本文档提供DiskANN版本说明，涵盖产品版本信息、与操作系统、编译器和CPU配套说明、版本更新说明与配套文档。
+
 ## 版本配套说明
 
 ### 产品版本信息
 
-<a name="table62675726"></a>
-<table><tbody><tr id="row41561572"><th class="firstcol" valign="top" width="42.17%" id="mcps1.1.3.1.1"><p id="p11044137"><a name="p11044137"></a><a name="p11044137"></a>产品名称</p>
-</th>
-<td class="cellrowborder" valign="top" width="57.830000000000005%" headers="mcps1.1.3.1.1 "><p id="p48427257"><a name="p48427257"></a><a name="p48427257"></a>Kunpeng BoostKit</p>
-</td>
-</tr>
-<tr id="row24726251"><th class="firstcol" valign="top" width="42.17%" id="mcps1.1.3.2.1"><p id="p56669300"><a name="p56669300"></a><a name="p56669300"></a>产品版本</p>
-</th>
-<td class="cellrowborder" valign="top" width="57.830000000000005%" headers="mcps1.1.3.2.1 "><p id="p16166112734513"><a name="p16166112734513"></a><a name="p16166112734513"></a><span id="text1726192733514"><a name="text1726192733514"></a><a name="text1726192733514"></a>26.1.RC1</span></p>
-</td>
-</tr>
-<tr id="row5497143514612"><th class="firstcol" valign="top" width="42.17%" id="mcps1.1.3.3.1"><p id="p162251517551"><a name="p162251517551"></a><a name="p162251517551"></a>软件名称</p>
-</th>
-<td class="cellrowborder" valign="top" width="57.830000000000005%" headers="mcps1.1.3.3.1 "><p id="p51757141375"><a name="p51757141375"></a><a name="p51757141375"></a>DiskANN</p>
-</td>
-</tr>
-<tr id="row615762416269"><th class="firstcol" valign="top" width="42.17%" id="mcps1.1.3.4.1"><p id="p12158152417260"><a name="p12158152417260"></a><a name="p12158152417260"></a>软件版本</p>
-</th>
-<td class="cellrowborder" valign="top" width="57.830000000000005%" headers="mcps1.1.3.4.1 "><p id="p5175714137"><a name="p5175714137"></a><a name="p5175714137"></a>V1.0.0</p>
-</td>
-</tr>
-</tbody>
-</table>
+|项目|内容|
+| --- | --- |
+| 产品名称 | Kunpeng BoostKit |
+| 产品版本 | 26.1.RC1 |
+| 软件名称 | DiskANN |
+| 软件版本 | v1.0.0 |
 
 ### 与操作系统、编译器和CPU配套说明
 
@@ -35,7 +20,7 @@
 | openEuler 24.03 LTS SP3 | 鲲鹏950 7592C处理器 | 24\*64GB | GCC 12.3.1 |
 | Debian 12 | 鲲鹏950 7592C处理器 | 24\*64GB | LLVM 16.0.6 |
 
-## V1.0.0
+## v1.0.0
 
 ### 更新说明
 
@@ -64,7 +49,7 @@
 
 ## 版本配套文档
 
-### V1.0.0版本配套文档
+### v1.0.0版本配套文档
 
 | 文档名称 | 内容简介 | 交付形式 |
 | --- | --- | --- |

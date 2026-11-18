@@ -1,5 +1,7 @@
 # 最佳实践
 
+本文档介绍DiskANN在鲲鹏平台上的优化方法，介绍全量优化和等价优化两种优化方法的使用步骤与测试流程，适用于需要在鲲鹏平台上部署和优化DiskANN的用户。
+
 ## 全量优化
 
 本节介绍在鲲鹏平台测试全量优化后DiskANN的方法，依赖鲲鹏的全量优化补丁文件0001-diskann\_0.7.0-optimize-neq.patch。使用示例为sift1M数据集。
@@ -39,7 +41,7 @@
 
 2. 请参考《[安装指南](./installation_guide.md)》编译DiskANN。
 
-   >**说明：** 作为全量优化后DiskANN测试，需开启与鲲鹏优化相关的宏 **-DFAST\_DISKANN=ON**。
+   全量优化DiskANN测试，需开启与鲲鹏优化相关的宏 **-DFAST\_DISKANN=ON**。
 
 3. 处理数据集。
 
@@ -62,9 +64,9 @@
     bash test_bge.sh /path/to/data/sift search
     ```
 
-测试结果如下所示：
+    测试结果如下所示。
 
-<img src="figures/diskann-best_practices-neq.jpg" alt="diskann-best_practices-neq" width="800"/>
+    ![加载构建好的索引进行查询的回显](./figures/diskann-best_practices-neq.jpg)
 
 ## 等价优化
 
@@ -105,7 +107,7 @@
 
 2. 请参考《[安装指南](./installation_guide.md)》编译DiskANN。
 
-   >**说明：** 作为等价优化后DiskANN测试，需开启与鲲鹏优化相关的宏 **-DFAST\_DISKANN=ON**。
+   等价优化DiskANN测试，需开启与鲲鹏优化相关的宏 **-DFAST\_DISKANN=ON**。
 
 3. 处理数据集。
 
@@ -128,6 +130,12 @@
     bash test_bge.sh /path/to/data/sift search
     ```
 
-测试结果如下所示：
+   测试结果如下所示。
 
-<img src="figures/diskann-best_practices-eqv.jpg" alt="diskann-best_practices-eqv" width="600"/>
+   ![加载构建好的索引进行查询的执行回显](./figures/diskann-best_practices-eqv.jpg)
+
+## 修订记录
+
+|文档版本|发布日期|修改说明|
+|--|--|--|
+|01|2026-06-30|第一次正式发布。|
